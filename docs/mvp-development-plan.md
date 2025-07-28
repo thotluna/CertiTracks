@@ -52,14 +52,7 @@ graph TB
         D4[API Rate Limiting]
     end
     
-    style A1 fill:#90EE90
-    style A2 fill:#90EE90
-    style A3 fill:#90EE90
-    style A4 fill:#90EE90
-    style B1 fill:#FFD700
-    style B2 fill:#FFD700
-    style B3 fill:#FFD700
-    style B4 fill:#FFD700
+    
 ```
 
 ## Fases de Desarrollo
@@ -81,98 +74,98 @@ graph TB
 - Las migraciones de base de datos se ejecutan sin errores
 - Todos los contenedores inician y se comunican correctamente
 
-#### Sprint 1.2: Authentication & User Management (Week 2)
-**Deliverables:**
-- [ ] User registration and login functionality
-- [ ] JWT-based authentication system
-- [ ] Password security implementation
-- [ ] Basic user profile management
-- [ ] Role-based access control (Admin/User)
+#### Sprint 1.2: Autenticación y Gestión de Usuarios (Semana 2)
+**Entregables:**
+- [ ] Funcionalidad de registro e inicio de sesión de usuarios
+- [ ] Sistema de autenticación basado en JWT
+- [ ] Implementación de seguridad de contraseñas
+- [ ] Gestión básica de perfiles de usuario
+- [ ] Control de acceso basado en roles (Administrador/Usuario)
 
-**Acceptance Criteria:**
-- Users can register, login, and logout securely
-- JWT tokens expire and refresh properly
-- Password requirements enforced
-- Admin users can manage other users
-- Session management works correctly
+**Criterios de Aceptación:**
+- Los usuarios pueden registrarse, iniciar sesión y cerrar sesión de forma segura
+- Los tokens JWT expiran y se actualizan correctamente
+- Se aplican los requisitos de contraseña
+- Los administradores pueden gestionar otros usuarios
+- La gestión de sesiones funciona correctamente
 
-#### Sprint 1.3: Core Data Models (Week 3)
-**Deliverables:**
-- [ ] People management (CRUD operations)
-- [ ] Equipment management (CRUD operations)
-- [ ] Certification types management
-- [ ] Basic data validation and sanitization
-- [ ] Database relationships and constraints
+#### Sprint 1.3: Modelos de Datos Principales (Semana 3)
+**Entregables:**
+- [ ] Gestión de personas (operaciones CRUD)
+- [ ] Gestión de equipos (operaciones CRUD)
+- [ ] Gestión de tipos de certificación
+- [ ] Validación y saneamiento básico de datos
+- [ ] Relaciones y restricciones de base de datos
 
-**Acceptance Criteria:**
-- All CRUD operations work for people and equipment
-- Data validation prevents invalid entries
-- Database relationships maintain referential integrity
-- Soft delete functionality implemented
-- Audit fields (created_at, updated_at) populated
+**Criterios de Aceptación:**
+- Todas las operaciones CRUD funcionan para personas y equipos
+- La validación de datos evita entradas inválidas
+- Las relaciones de la base de datos mantienen la integridad referencial
+- Funcionalidad de borrado lógico implementada
+- Campos de auditoría (created_at, updated_at) poblados
 
-#### Sprint 1.4: Basic UI Framework (Week 4)
-**Deliverables:**
-- [ ] Next.js application setup with routing
-- [ ] UI component library implementation
-- [ ] Responsive layout and navigation
-- [ ] Basic forms for data entry
-- [ ] Error handling and loading states
+#### Sprint 1.4: Marco Básico de Interfaz de Usuario (Semana 4)
+**Entregables:**
+- [ ] Configuración de la aplicación Next.js con enrutamiento
+- [ ] Implementación de biblioteca de componentes de UI
+- [ ] Diseño responsivo y navegación
+- [ ] Formularios básicos para entrada de datos
+- [ ] Manejo de errores y estados de carga
 
-**Acceptance Criteria:**
-- Application loads and navigates properly
-- Forms validate input and show errors
-- Responsive design works on mobile and desktop
-- Loading states provide user feedback
-- Error messages are user-friendly
+**Criterios de Aceptación:**
+- La aplicación se carga y navega correctamente
+- Los formularios validan la entrada y muestran errores
+- El diseño responsivo funciona en móviles y escritorios
+- Los estados de carga proporcionan retroalimentación al usuario
+- Los mensajes de error son fáciles de entender
 
 ### Fase 2: Funcionalidad Principal (Semanas 5-8)
 **Objetivo**: Implementar las características principales de gestión de certificaciones
 
-#### Sprint 2.1: Certification Management (Week 5)
-**Deliverables:**
-- [ ] Certification CRUD operations
-- [ ] Link certifications to people/equipment
-- [ ] Certification status management
-- [ ] Expiration date calculations
-- [ ] Basic certification listing and filtering
+#### Sprint 2.1: Gestión de Certificaciones (Semana 5)
+**Entregables:**
+- [ ] Operaciones CRUD de certificaciones
+- [ ] Vinculación de certificaciones a personas/equipos
+- [ ] Gestión del estado de certificaciones
+- [ ] Cálculos de fechas de vencimiento
+- [ ] Listado y filtrado básico de certificaciones
 
-**Acceptance Criteria:**
-- Certifications can be created, viewed, updated, deleted
-- Certifications properly link to people or equipment
-- Status updates reflect current state
-- Expiration calculations are accurate
-- List view shows relevant information clearly
+**Criterios de Aceptación:**
+- Las certificaciones se pueden crear, ver, actualizar y eliminar
+- Las certificaciones se vinculan correctamente a personas o equipos
+- Las actualizaciones de estado reflejan el estado actual
+- Los cálculos de vencimiento son precisos
+- La vista de lista muestra la información relevante de manera clara
 
-#### Sprint 2.2: Dashboard & Overview (Week 6)
-**Deliverables:**
-- [ ] Dashboard with key metrics
-- [ ] Expiring certifications widget
-- [ ] Recent activity feed
-- [ ] Quick action buttons
-- [ ] Status indicators and alerts
+#### Sprint 2.2: Panel de Control y Visión General (Semana 6)
+**Entregables:**
+- [ ] Panel de control con métricas clave
+- [ ] Widget de certificaciones por vencer
+- [ ] Feed de actividad reciente
+- [ ] Botones de acción rápida
+- [ ] Indicadores de estado y alertas
 
-**Acceptance Criteria:**
-- Dashboard loads quickly with accurate data
-- Expiring certifications prominently displayed
-- Metrics update in real-time
-- Quick actions work from dashboard
-- Visual indicators clearly show status
+**Criterios de Aceptación:**
+- El panel de control se carga rápidamente con datos precisos
+- Las certificaciones por vencer se muestran de manera destacada
+- Las métricas se actualizan en tiempo real
+- Las acciones rápidas funcionan desde el panel
+- Los indicadores visuales muestran claramente el estado
 
-#### Sprint 2.3: Search & Filtering (Week 7)
-**Deliverables:**
-- [ ] Global search functionality
-- [ ] Advanced filtering options
-- [ ] Sorting capabilities
-- [ ] Pagination implementation
-- [ ] Search result highlighting
+#### Sprint 2.3: Búsqueda y Filtrado (Semana 7)
+**Entregables:**
+- [ ] Funcionalidad de búsqueda global
+- [ ] Opciones de filtrado avanzado
+- [ ] Capacidades de ordenación
+- [ ] Implementación de paginación
+- [ ] Resaltado de términos de búsqueda
 
-**Acceptance Criteria:**
-- Search returns relevant results quickly
-- Filters work independently and in combination
-- Sorting works on all relevant columns
-- Pagination handles large datasets
-- Search terms are highlighted in results
+**Criterios de Aceptación:**
+- La búsqueda devuelve resultados relevantes rápidamente
+- Los filtros funcionan de forma independiente y en combinación
+- La ordenación funciona en todas las columnas relevantes
+- La paginación maneja grandes conjuntos de datos
+- Los términos de búsqueda se resaltan en los resultados
 
 #### Sprint 2.4: Basic Reporting (Week 8)
 **Deliverables:**
@@ -319,6 +312,8 @@ graph TB
 
 ### Conjunto de Características del MVP
 
+### Conjunto de Características del MVP
+
 #### Características Principales (Obligatorias)
 1. **Autenticación y Autorización de Usuarios**
    - Registro e inicio de sesión de usuarios
@@ -400,19 +395,32 @@ graph TB
 
 ```mermaid
 gantt
-    title CertiTrack MVP Development Timeline
+    title Cronograma de Desarrollo del MVP de CertiTrack
     dateFormat  YYYY-MM-DD
-    section Phase 1: Foundation
-    Infrastructure Setup    :p1-1, 2024-01-01, 1w
-    Authentication         :p1-2, after p1-1, 1w
-    Core Data Models       :p1-3, after p1-2, 1w
-    Basic UI Framework     :p1-4, after p1-3, 1w
     
-    section Phase 2: Core Functionality
-    Certification Management :p2-1, after p1-4, 1w
-    Dashboard & Overview    :p2-2, after p2-1, 1w
-    Search & Filtering      :p2-3, after p2-2, 1w
-    Basic Reporting         :p2-4, after p2-3, 1w
+    section Fase 1: Fundamentos
+    Configuración de la Infraestructura    :p1-1, 2024-01-01, 1w
+    Autenticación y Gestión de Usuarios    :p1-2, after p1-1, 1w
+    Modelos de Datos Básicos               :p1-3, after p1-2, 1w
+    Marco de Interfaz de Usuario Básico    :p1-4, after p1-3, 1w
+    
+    section Fase 2: Funcionalidad Principal
+    Gestión de Certificaciones             :p2-1, after p1-4, 1w
+    Panel de Control y Visión General      :p2-2, after p2-1, 1w
+    Búsqueda y Filtrado                    :p2-3, after p2-2, 1w
+    Informes Básicos                       :p2-4, after p2-3, 1w
+    
+    section Fase 3: Notificaciones
+    Infraestructura de Correo Electrónico  :p3-1, after p2-4, 1w
+    Motor de Reglas de Notificación        :p3-2, after p3-1, 1w
+    Notificaciones Automatizadas           :p3-3, after p3-2, 1w
+    Gestión de Notificaciones              :p3-4, after p3-3, 1w
+    
+    section Fase 4: Documentos y Finales
+    Sistema de Carga de Archivos           :p4-1, after p3-4, 1w
+    Gestión de Documentos                  :p4-2, after p4-1, 1w
+    Optimización del Sistema               :p4-3, after p4-2, 1w
+    Pruebas y Documentación                :p4-4, after p4-3, 1w
     
     section Phase 3: Notifications
     Email Infrastructure    :p3-1, after p2-4, 1w

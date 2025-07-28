@@ -9,28 +9,28 @@ CertiTrack is a web-based certification management system designed for small org
 This repository contains a complete architectural blueprint for CertiTrack, covering all aspects from requirements analysis to deployment strategy. The documentation is organized into the following key areas:
 
 ### 🔍 Analysis & Requirements
-- **[Requirements Analysis](requirements-analysis.md)** - Detailed business requirements, constraints, and non-functional requirements
-- **[MVP Development Plan](mvp-development-plan.md)** - Feature prioritization, development phases, and 16-week implementation timeline
+- **[Requirements Analysis](docs/requirements-analysis.md)** - Detailed business requirements, constraints, and non-functional requirements
+- **[MVP Development Plan](docs/mvp-development-plan.md)** - Feature prioritization, development phases, and 16-week implementation timeline
 
 ### 🏗️ System Design
-- **[System Architecture](system-architecture.md)** - High-level architecture, component design, and technology stack
-- **[Database Schema](database-schema.md)** - Complete database design with entity relationships and sample data
-- **[API Specification](api-specification.md)** - RESTful API endpoints, data contracts, and response formats
+- **[System Architecture](docs/system-architecture.md)** - High-level architecture, component design, and technology stack
+- **[Database Schema](docs/database-schema.md)** - Complete database design with entity relationships and sample data
+- **[API Specification](docs/api-specification.md)** - RESTful API endpoints, data contracts, and response formats
 
 ### 🎨 User Experience
-- **[UI Design & User Flows](ui-design.md)** - Wireframes, user interface design, and user journey mapping
-- **[Authentication & Authorization](authentication-authorization.md)** - Security architecture and access control design
+- **[UI Design & User Flows](docs/ui-design.md)** - Wireframes, user interface design, and user journey mapping
+- **[Authentication & Authorization](docs/authentication-authorization.md)** - Security architecture and access control design
 
 ### 🔧 Technical Implementation
-- **[Notification System](notification-system.md)** - Automated email notification architecture and implementation
-- **[File Management System](file-management-system.md)** - Secure document upload, storage, and retrieval system
-- **[Security Considerations](security-considerations.md)** - Comprehensive security measures and threat mitigation
+- **[Notification System](docs/notification-system.md)** - Automated email notification architecture and implementation
+- **[File Management System](docs/file-management-system.md)** - Secure document upload, storage, and retrieval system
+- **[Security Considerations](docs/security-considerations.md)** - Comprehensive security measures and threat mitigation
 
 ### 🚀 Development & Deployment
-- **[Development Setup](development-setup.md)** - Complete development environment configuration guide
-- **[Project Structure & Guidelines](project-structure-guidelines.md)** - Code organization, standards, and development workflows
-- **[Testing Strategy](testing-strategy.md)** - Comprehensive testing approach including unit, integration, and E2E testing
-- **[Deployment Strategy](deployment-strategy.md)** - AWS infrastructure setup and deployment automation
+- **[Development Setup](docs/development-setup.md)** - Complete development environment configuration guide
+- **[Project Structure & Guidelines](docs/project-structure-guidelines.md)** - Code organization, standards, and development workflows
+- **[Testing Strategy](docs/testing-strategy.md)** - Comprehensive testing approach including unit, integration, and E2E testing
+- **[Deployment Strategy](docs/deployment-strategy.md)** - AWS infrastructure setup and deployment automation
 
 ## 🏛️ System Architecture Overview
 
