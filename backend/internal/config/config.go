@@ -1,0 +1,191 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"time"
+
+	"github.com/joho/godotenv"
+)
+
+type Config struct {
+	App      AppConfig
+	Database DatabaseConfig
+	Redis    RedisConfig
+	JWT      JWTConfig
+	SMTP     SMTPConfig
+	Storage  StorageConfig
+	Logger   LoggerConfig
+}
+
+type AppConfig struct {
+	Env  string
+	Port string
+	URL  string
+}
+
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	Name     string
+	User     string
+	Password string
+	SSLMode  string
+}
+
+type RedisConfig struct {
+	URL      string
+	Password string
+}
+
+type JWTConfig struct {
+	Secret             string
+	AccessTokenExpiry  time.Duration
+	RefreshTokenExpiry time.Duration
+	Issuer             string
+	Audience           string
+}
+
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	From     string
+}
+
+type StorageConfig struct {
+	Root        string
+	MaxSizeMB   int
+	AllowedExts []string
+}
+
+type LoggerConfig struct {
+	Level         string
+	EnableMetrics bool
+}
+
+func Load() (*Config, error) {
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("No .env file found, using environment variables")
+	}
+
+	config := &Config{
+		App: AppConfig{
+			Env:  getEnv("APP_ENV", "development"),
+			Port: getEnv("PORT", "8080"),
+			URL:  getEnv("APP_URL", "http://localhost:3000"),
+		},
+		Database: DatabaseConfig{
+			Host:     getEnv("DB_HOST", "localhost"),
+			Port:     getEnv("DB_PORT", "5432"),
+			Name:     getEnv("DB_NAME", "certitrack_dev"),
+			User:     getEnv("DB_USER", "certitrack_user"),
+			Password: getEnv("DB_PASSWORD", "dev_password"),
+			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+		},
+		Redis: RedisConfig{
+			URL:      getEnv("REDIS_URL", "redis://localhost:6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
+		},
+		JWT: JWTConfig{
+			Secret:             getEnv("JWT_SECRET", "development-jwt-secret-key-minimum-32-characters"),
+			AccessTokenExpiry:  parseDuration(getEnv("JWT_ACCESS_TOKEN_EXPIRY", "15m")),
+			RefreshTokenExpiry: parseDuration(getEnv("JWT_REFRESH_TOKEN_EXPIRY", "168h")),
+			Issuer:             getEnv("JWT_ISSUER", "certitrack-api"),
+			Audience:           getEnv("JWT_AUDIENCE", "certitrack-client"),
+		},
+		SMTP: SMTPConfig{
+			Host:     getEnv("SMTP_HOST", "localhost"),
+			Port:     parseInt(getEnv("SMTP_PORT", "1025")),
+			Username: getEnv("SMTP_USERNAME", ""),
+			Password: getEnv("SMTP_PASSWORD", ""),
+			From:     getEnv("SMTP_FROM", "CertiTrack <noreply@certitrack.local>"),
+		},
+		Storage: StorageConfig{
+			Root:        getEnv("STORAGE_ROOT", "./storage"),
+			MaxSizeMB:   parseInt(getEnv("MAX_FILE_SIZE_MB", "10")),
+			AllowedExts: []string{".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".gif"},
+		},
+		Logger: LoggerConfig{
+			Level:         getEnv("LOG_LEVEL", "info"),
+			EnableMetrics: parseBool(getEnv("ENABLE_METRICS", "false")),
+		},
+	}
+
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
+	}
+
+	return config, nil
+}
+
+func (c *Config) Validate() error {
+	if c.JWT.Secret == "" || len(c.JWT.Secret) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 characters long")
+	}
+
+	if c.Database.Host == "" {
+		return fmt.Errorf("DB_HOST is required")
+	}
+
+	if c.Database.Name == "" {
+		return fmt.Errorf("DB_NAME is required")
+	}
+
+	if c.Database.User == "" {
+		return fmt.Errorf("DB_USER is required")
+	}
+
+	return nil
+}
+
+func (c *Config) GetDatabaseDSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		c.Database.Host,
+		c.Database.Port,
+		c.Database.User,
+		c.Database.Password,
+		c.Database.Name,
+		c.Database.SSLMode,
+	)
+}
+
+func (c *Config) IsDevelopment() bool {
+	return c.App.Env == "development"
+}
+
+func (c *Config) IsProduction() bool {
+	return c.App.Env == "production"
+}
+
+// Helper functions
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func parseInt(s string) int {
+	if i, err := strconv.Atoi(s); err == nil {
+		return i
+	}
+	return 0
+}
+
+func parseBool(s string) bool {
+	if b, err := strconv.ParseBool(s); err == nil {
+		return b
+	}
+	return false
+}
+
+func parseDuration(s string) time.Duration {
+	if d, err := time.ParseDuration(s); err == nil {
+		return d
+	}
+	return 0
+}
