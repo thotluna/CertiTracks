@@ -9,10 +9,10 @@ import (
 )
 
 type AuthHandler struct {
-	authService *services.AuthService
+	authService services.AuthService
 }
 
-func NewAuthHandler(authService *services.AuthService) *AuthHandler {
+func NewAuthHandler(authService services.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 	}
@@ -63,7 +63,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	response, err := h.authService.Login(&req)
 	if err != nil {
 		switch err {
-		case services.ErrInvalidCredentials:
+		case services.ErrUserNotFound, services.ErrInvalidCredentials:
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid email or password",
 			})

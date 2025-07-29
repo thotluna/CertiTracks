@@ -6,16 +6,29 @@ import (
 
 	"certitrack/internal/config"
 	"certitrack/internal/models"
+	"certitrack/internal/repositories"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
-type AuthService struct {
-	db     *gorm.DB
-	config *config.Config
+type AuthService interface {
+	Register(req *RegisterRequest) (*AuthResponse, error)
+	Login(req *LoginRequest) (*AuthResponse, error)
+	RefreshToken(req *RefreshRequest) (*AuthResponse, error)
+	GetUserFromToken(token string) (*models.User, error)
+	ValidateAccessToken(token string) (*JWTClaims, error)
+	ValidateRefreshToken(token string) (*JWTClaims, error)
+	HashPassword(password string) (string, error)
+	CheckPassword(password, hash string) bool
 }
+
+type AuthServiceImpl struct {
+	repository repositories.UserRepository
+	config     *config.Config
+}
+
+var _ AuthService = (*AuthServiceImpl)(nil)
 
 type JWTClaims struct {
 	UserID string `json:"user_id"`
@@ -56,41 +69,38 @@ var (
 	ErrTokenExpired       = errors.New("token has expired")
 )
 
-func NewAuthService(db *gorm.DB, config *config.Config) *AuthService {
-	return &AuthService{
-		db:     db,
-		config: config,
+func NewAuthService(config *config.Config, repository repositories.UserRepository) *AuthServiceImpl {
+	return &AuthServiceImpl{
+		config:     config,
+		repository: repository,
 	}
 }
 
-func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
-	var existingUser models.User
-	if err := s.db.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+func (s *AuthServiceImpl) Register(req *RegisterRequest) (*AuthResponse, error) {
+
+	if s.repository.EmailExists(req.Email) {
 		return nil, ErrUserExists
 	}
 
-	// Hash password
 	hashedPassword, err := s.HashPassword(req.Password)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create user
 	user := models.User{
 		Email:     req.Email,
 		Password:  hashedPassword,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Phone:     req.Phone,
-		Role:      "user", // Default role
+		Role:      "user",
 		IsActive:  true,
 	}
 
-	if err := s.db.Create(&user).Error; err != nil {
+	if err := s.repository.CreateUser(&user); err != nil {
 		return nil, err
 	}
 
-	// Generate tokens
 	accessToken, err := s.GenerateAccessToken(&user)
 	if err != nil {
 		return nil, err
@@ -101,10 +111,9 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 		return nil, err
 	}
 
-	// Update last login
 	now := time.Now()
 	user.LastLogin = &now
-	s.db.Save(&user)
+	s.repository.UpdateLastLogin(user.ID.String(), now)
 
 	return &AuthResponse{
 		User:         &user,
@@ -114,93 +123,78 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 	}, nil
 }
 
-// Login authenticates a user and returns tokens
-func (s *AuthService) Login(req *LoginRequest) (*AuthResponse, error) {
-	var user models.User
-	if err := s.db.Where("email = ? AND is_active = ?", req.Email, true).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrInvalidCredentials
-		}
-		return nil, err
+func (s *AuthServiceImpl) Login(req *LoginRequest) (*AuthResponse, error) {
+	user, err := s.repository.FindActiveByEmail(req.Email)
+	if err != nil {
+		return nil, ErrUserNotFound
 	}
 
-	// Check password
 	if !s.CheckPassword(req.Password, user.Password) {
 		return nil, ErrInvalidCredentials
 	}
 
-	// Generate tokens
-	accessToken, err := s.GenerateAccessToken(&user)
+	accessToken, err := s.GenerateAccessToken(user)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.GenerateRefreshToken(&user)
+	refreshToken, err := s.GenerateRefreshToken(user)
 	if err != nil {
 		return nil, err
 	}
 
-	// Update last login
 	now := time.Now()
 	user.LastLogin = &now
-	s.db.Save(&user)
+	s.repository.UpdateLastLogin(user.ID.String(), now)
 
 	return &AuthResponse{
-		User:         &user,
+		User:         user,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresAt:    time.Now().Add(s.config.JWT.AccessTokenExpiry),
 	}, nil
 }
 
-// RefreshToken generates new tokens using a refresh token
-func (s *AuthService) RefreshToken(req *RefreshRequest) (*AuthResponse, error) {
+func (s *AuthServiceImpl) RefreshToken(req *RefreshRequest) (*AuthResponse, error) {
 	claims, err := s.ValidateRefreshToken(req.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
 
-	var user models.User
-	if err := s.db.Where("id = ? AND is_active = ?", claims.UserID, true).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
+	user, err := s.repository.FindActiveByID(claims.UserID)
+	if err != nil {
+		return nil, ErrUserNotFound
 	}
 
-	// Generate new tokens
-	accessToken, err := s.GenerateAccessToken(&user)
+	accessToken, err := s.GenerateAccessToken(user)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.GenerateRefreshToken(&user)
+	refreshToken, err := s.GenerateRefreshToken(user)
 	if err != nil {
 		return nil, err
 	}
 
 	return &AuthResponse{
-		User:         &user,
+		User:         user,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresAt:    time.Now().Add(s.config.JWT.AccessTokenExpiry),
 	}, nil
 }
 
-// HashPassword hashes a plain text password
-func (s *AuthService) HashPassword(password string) (string, error) {
+func (s *AuthServiceImpl) HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(bytes), err
 }
 
-// CheckPassword compares a plain text password with a hash
-func (s *AuthService) CheckPassword(password, hash string) bool {
+func (s *AuthServiceImpl) CheckPassword(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
 
-// GenerateAccessToken creates a new access token
-func (s *AuthService) GenerateAccessToken(user *models.User) (string, error) {
+func (s *AuthServiceImpl) GenerateAccessToken(user *models.User) (string, error) {
 	claims := JWTClaims{
 		UserID: user.ID.String(),
 		Email:  user.Email,
@@ -218,8 +212,7 @@ func (s *AuthService) GenerateAccessToken(user *models.User) (string, error) {
 	return token.SignedString([]byte(s.config.JWT.Secret))
 }
 
-// GenerateRefreshToken creates a new refresh token
-func (s *AuthService) GenerateRefreshToken(user *models.User) (string, error) {
+func (s *AuthServiceImpl) GenerateRefreshToken(user *models.User) (string, error) {
 	claims := JWTClaims{
 		UserID: user.ID.String(),
 		Email:  user.Email,
@@ -237,8 +230,7 @@ func (s *AuthService) GenerateRefreshToken(user *models.User) (string, error) {
 	return token.SignedString([]byte(s.config.JWT.Secret))
 }
 
-// ValidateAccessToken validates and parses an access token
-func (s *AuthService) ValidateAccessToken(tokenString string) (*JWTClaims, error) {
+func (s *AuthServiceImpl) ValidateAccessToken(tokenString string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
@@ -260,25 +252,20 @@ func (s *AuthService) ValidateAccessToken(tokenString string) (*JWTClaims, error
 	return nil, ErrInvalidToken
 }
 
-// ValidateRefreshToken validates and parses a refresh token
-func (s *AuthService) ValidateRefreshToken(tokenString string) (*JWTClaims, error) {
-	return s.ValidateAccessToken(tokenString) // Same validation logic
+func (s *AuthServiceImpl) ValidateRefreshToken(tokenString string) (*JWTClaims, error) {
+	return s.ValidateAccessToken(tokenString)
 }
 
-// GetUserFromToken extracts user information from a valid token
-func (s *AuthService) GetUserFromToken(tokenString string) (*models.User, error) {
+func (s *AuthServiceImpl) GetUserFromToken(tokenString string) (*models.User, error) {
 	claims, err := s.ValidateAccessToken(tokenString)
 	if err != nil {
 		return nil, err
 	}
 
-	var user models.User
-	if err := s.db.Where("id = ? AND is_active = ?", claims.UserID, true).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrUserNotFound
-		}
+	user, err := s.repository.FindActiveByID(claims.UserID)
+	if err != nil {
 		return nil, err
 	}
 
-	return &user, nil
+	return user, nil
 }

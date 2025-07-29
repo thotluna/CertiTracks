@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthMiddleware(authService *services.AuthService) gin.HandlerFunc {
+func AuthMiddleware(authService services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -78,7 +78,7 @@ func AdminMiddleware() gin.HandlerFunc {
 }
 
 // OptionalAuthMiddleware validates JWT tokens but doesn't require them
-func OptionalAuthMiddleware(authService *services.AuthService) gin.HandlerFunc {
+func OptionalAuthMiddleware(authService services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
