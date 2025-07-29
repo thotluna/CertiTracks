@@ -9,6 +9,7 @@ import (
 	"certitrack/internal/database"
 	"certitrack/internal/handlers"
 	"certitrack/internal/middleware"
+	"certitrack/internal/repositories"
 	"certitrack/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +38,8 @@ func main() {
 		log.Fatal("Failed to create default admin:", err)
 	}
 
-	authService := services.NewAuthService(db, cfg)
+	userRepo := repositories.NewUserRepositoryImpl(db)
+	authService := services.NewAuthService(cfg, userRepo)
 	authHandler := handlers.NewAuthHandler(authService)
 	router := gin.Default()
 
