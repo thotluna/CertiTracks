@@ -228,7 +228,6 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
-// Test de errores para Login
 func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 	mockService := new(MockAuthService)
 	handler := NewAuthHandler(mockService)
@@ -269,14 +268,14 @@ func TestAuthHandler_Login_UserNotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Equal(t, "Login failed", response["error"])
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "Invalid email or password", response["error"])
 	mockService.AssertExpectations(t)
 }
 
-// Test de errores para RefreshToken
 func TestAuthHandler_RefreshToken_Expired(t *testing.T) {
 	mockService := new(MockAuthService)
 	handler := NewAuthHandler(mockService)
@@ -325,11 +324,10 @@ func TestAuthHandler_RefreshToken_Invalid(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
-// Test de validación de campos
 func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
 	handler := NewAuthHandler(new(MockAuthService))
 	r := setupTestRouter(handler)
-	
+
 	tests := []struct {
 		name           string
 		requestBody    string
@@ -373,7 +371,6 @@ func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
 	}
 }
 
-// Test de error interno del servidor
 func TestAuthHandler_InternalServerError(t *testing.T) {
 	mockService := new(MockAuthService)
 	handler := NewAuthHandler(mockService)
@@ -397,7 +394,6 @@ func TestAuthHandler_InternalServerError(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
-// Test para JSON inválido
 func TestAuthHandler_InvalidJSON(t *testing.T) {
 	handler := NewAuthHandler(new(MockAuthService))
 	r := setupTestRouter(handler)
