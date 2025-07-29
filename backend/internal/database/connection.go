@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"certitrack/internal/config"
 	"certitrack/internal/models"
@@ -16,7 +17,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	dsn := cfg.GetDatabaseDSN()
 
 	var gormLogger logger.Interface
-	if cfg.IsDevelopment() {
+	if os.Getenv("GO_ENV") != "test" {
 		gormLogger = logger.Default.LogMode(logger.Info)
 	} else {
 		gormLogger = logger.Default.LogMode(logger.Silent)
@@ -42,7 +43,9 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	log.Println("🔄 Running database migrations...")
+	if os.Getenv("GO_ENV") != "test" {
+		log.Println("🔄 Running database migrations...")
+	}
 
 	err := db.AutoMigrate(
 		&models.User{},
@@ -56,11 +59,12 @@ func AutoMigrate(db *gorm.DB) error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Println("✅ Database migrations completed")
+	if os.Getenv("GO_ENV") != "test" {
+		log.Println("✅ Database migrations completed")
+	}
 	return nil
 }
 
-// CreateDefaultAdmin creates a default admin user if none exists
 func CreateDefaultAdmin(db *gorm.DB) error {
 	var count int64
 	if err := db.Model(&models.User{}).Where("role = ?", "admin").Count(&count).Error; err != nil {
@@ -68,11 +72,12 @@ func CreateDefaultAdmin(db *gorm.DB) error {
 	}
 
 	if count > 0 {
-		log.Println("ℹ️  Admin user already exists, skipping creation")
+		if os.Getenv("GO_ENV") != "test" {
+			log.Println("ℹ️  Admin user already exists, skipping creation")
+		}
 		return nil
 	}
 
-	// Create default admin user
 	admin := models.User{
 		Email:     "admin@certitrack.local",
 		Password:  "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // password: "password"
@@ -86,6 +91,8 @@ func CreateDefaultAdmin(db *gorm.DB) error {
 		return fmt.Errorf("failed to create default admin: %w", err)
 	}
 
-	log.Println("✅ Default admin user created (admin@certitrack.local / password)")
+	if os.Getenv("GO_ENV") != "test" {
+		log.Println("✅ Default admin user created (admin@certitrack.local / password)")
+	}
 	return nil
 }

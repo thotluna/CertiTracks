@@ -7,14 +7,14 @@ setup:
 	@echo "Installing backend dependencies..."
 	@cd backend && go mod tidy
 	@echo "Installing frontend dependencies..."
-	@cd frontend && npm install
+	@cd frontend && pnpm install
 	@echo "Starting Docker services..."
 	@docker-compose up -d postgres redis mailhog
 	@sleep 10
-	@echo "Running database migrations..."
-	@$(MAKE) db-migrate
-	@echo "Seeding database..."
-	@$(MAKE) db-seed
+	# @echo "Running database migrations..."
+	# @$(MAKE) db-migrate
+	# @echo "Seeding database..."
+	# @$(MAKE) db-seed
 	@echo "Setup complete! Run 'make dev' to start development servers."
 
 # Start development servers
@@ -23,8 +23,8 @@ dev:
 	@docker-compose up -d postgres redis mailhog
 	@echo "Starting backend server..."
 	@cd backend && go run cmd/server/main.go &
-	@echo "Starting frontend server..."
-	@cd frontend && npm run dev
+	# @echo "Starting frontend server..."
+	# @cd frontend && pnpm run dev
 
 # Clean up
 clean:
@@ -40,7 +40,7 @@ build-backend:
 
 build-frontend:
 	@echo "Building frontend..."
-	@cd frontend && npm run build
+	@cd frontend && pnpm run build
 
 build: build-backend build-frontend
 
@@ -49,9 +49,13 @@ test-backend:
 	@echo "Running backend tests..."
 	@cd backend && go test -v -race -cover ./...
 
+test-backend-integration:
+	@echo "Running backend integration tests..."
+	@cd backend && unset POSTGRES_TEST_PORT && go test -v -tags=integration ./...
+
 test-frontend:
 	@echo "Running frontend tests..."
-	@cd frontend && npm test
+	@cd frontend && pnpm test
 
 test: test-backend test-frontend
 
@@ -62,7 +66,7 @@ lint-backend:
 
 lint-frontend:
 	@echo "Linting frontend code..."
-	@cd frontend && npm run lint
+	@cd frontend && pnpm run lint
 
 lint: lint-backend lint-frontend
 

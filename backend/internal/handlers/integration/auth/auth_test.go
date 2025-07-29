@@ -2,20 +2,22 @@ package auth_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
+	"time"
 
 	"certitrack/internal/config"
-	"certitrack/internal/database"
 	"certitrack/internal/handlers"
 	"certitrack/internal/middleware"
 	"certitrack/internal/repositories"
 	"certitrack/internal/services"
+	"certitrack/testutils/testcontainer"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
 )
 
 type testUser struct {
@@ -25,13 +27,36 @@ type testUser struct {
 	LastName  string `json:"lastName"`
 }
 
-func setupTestRouter() *gin.Engine {
-	os.Setenv("APP_ENV", "test")
-	cfg, _ := config.Load()
-	db, _ := database.Connect(cfg)
-	_ = database.AutoMigrate(db)
+type testRouter struct {
+	Router *gin.Engine
+	DB     *testcontainer.PostgresContainer
+}
 
-	userRepo := repositories.NewUserRepositoryImpl(db)
+func setupTestRouter(t *testing.T) *testRouter {
+	ctx := context.Background()
+
+	cfg := &config.Config{
+		Database: config.DatabaseConfig{
+			Host:     "localhost",
+			Port:     "5432",
+			Name:     "certitrack_test",
+			User:     "testuser",
+			Password: "testpassword",
+			SSLMode:  "disable",
+		},
+		JWT: config.JWTConfig{
+			Secret:             "test_secret_key_must_be_at_least_32_chars_long_123",
+			AccessTokenExpiry:  15 * time.Minute,
+			RefreshTokenExpiry: 24 * time.Hour,
+			Issuer:             "certitrack-test",
+			Audience:           "certitrack-test-client",
+		},
+	}
+
+	pgContainer, err := testcontainer.SetupPostgres(ctx, cfg)
+	require.NoError(t, err, "Failed to setup postgres container")
+
+	userRepo := repositories.NewUserRepositoryImpl(pgContainer.DB)
 	authService := services.NewAuthService(cfg, userRepo)
 
 	gin.SetMode(gin.TestMode)
@@ -53,20 +78,27 @@ func setupTestRouter() *gin.Engine {
 		})
 	}
 
-	return r
+	return &testRouter{
+		Router: r,
+		DB:     pgContainer,
+	}
 }
 
-func registerTestUser(_ *testing.T, router *gin.Engine, user testUser) *httptest.ResponseRecorder {
+func registerTestUser(t *testing.T, router *testRouter, user testUser) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(user)
 	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	router.Router.ServeHTTP(w, req)
+	t.Cleanup(func() {
+		db, _ := router.DB.DB.DB()
+		db.Exec("TRUNCATE TABLE users CASCADE")
+	})
 	return w
 }
 
-func loginTestUser(_ *testing.T, router *gin.Engine, email, password string) *httptest.ResponseRecorder {
+func loginTestUser(_ *testing.T, router *testRouter, email, password string) *httptest.ResponseRecorder {
 	loginData := map[string]string{
 		"email":    email,
 		"password": password,
@@ -77,12 +109,57 @@ func loginTestUser(_ *testing.T, router *gin.Engine, email, password string) *ht
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	router.Router.ServeHTTP(w, req)
 	return w
 }
 
-func getResponseData(_ *testing.T, w *httptest.ResponseRecorder) map[string]interface{} {
+func getResponseData(t *testing.T, w *httptest.ResponseRecorder) map[string]interface{} {
 	var response map[string]interface{}
-	_ = json.Unmarshal(w.Body.Bytes(), &response)
-	return response["data"].(map[string]interface{})
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	require.NoError(t, err, "Failed to parse response body")
+
+	if data, ok := response["data"]; ok {
+		return data.(map[string]interface{})
+	}
+	return response
+}
+
+func getAccessToken(t *testing.T, router *testRouter) string {
+	user := testUser{
+		Email:     "test@example.com",
+		Password:  "password123",
+		FirstName: "Test",
+		LastName:  "User",
+	}
+
+	registerTestUser(t, router, user)
+
+	w := loginTestUser(t, router, user.Email, user.Password)
+	require.Equal(t, http.StatusOK, w.Code, "Login should succeed")
+
+	responseData := getResponseData(t, w)
+	accessToken, ok := responseData["accessToken"].(string)
+	require.True(t, ok, "Access token should be present in response")
+
+	return accessToken
+}
+
+func getRefreshToken(t *testing.T, router *testRouter) string {
+	user := testUser{
+		Email:     "refresh_test@example.com",
+		Password:  "password123",
+		FirstName: "Refresh",
+		LastName:  "Test",
+	}
+
+	registerTestUser(t, router, user)
+
+	w := loginTestUser(t, router, user.Email, user.Password)
+	require.Equal(t, http.StatusOK, w.Code, "Login should succeed")
+
+	responseData := getResponseData(t, w)
+	refreshToken, ok := responseData["refreshToken"].(string)
+	require.True(t, ok, "Refresh token should be present in response")
+
+	return refreshToken
 }

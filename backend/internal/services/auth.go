@@ -9,6 +9,7 @@ import (
 	"certitrack/internal/repositories"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -160,12 +161,10 @@ func (s *AuthServiceImpl) RefreshToken(req *RefreshRequest) (*AuthResponse, erro
 	if err != nil {
 		return nil, err
 	}
-
 	user, err := s.repository.FindActiveByID(claims.UserID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
-
 	accessToken, err := s.GenerateAccessToken(user)
 	if err != nil {
 		return nil, err
@@ -176,11 +175,22 @@ func (s *AuthServiceImpl) RefreshToken(req *RefreshRequest) (*AuthResponse, erro
 		return nil, err
 	}
 
+	if refreshToken == req.RefreshToken {
+		refreshToken, err = s.GenerateRefreshToken(user)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	now := time.Now()
+	user.LastLogin = &now
+	s.repository.UpdateLastLogin(user.ID.String(), now)
+
 	return &AuthResponse{
 		User:         user,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		ExpiresAt:    time.Now().Add(s.config.JWT.AccessTokenExpiry),
+		ExpiresAt:    now.Add(s.config.JWT.AccessTokenExpiry),
 	}, nil
 }
 
@@ -213,17 +223,17 @@ func (s *AuthServiceImpl) GenerateAccessToken(user *models.User) (string, error)
 }
 
 func (s *AuthServiceImpl) GenerateRefreshToken(user *models.User) (string, error) {
-	claims := JWTClaims{
-		UserID: user.ID.String(),
-		Email:  user.Email,
-		Role:   user.Role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.config.JWT.RefreshTokenExpiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    s.config.JWT.Issuer,
-			Audience:  []string{s.config.JWT.Audience},
-		},
+	jti := uuid.New().String()
+	claims := jwt.MapClaims{
+		"user_id": user.ID.String(),
+		"email":   user.Email,
+		"role":    user.Role,
+		"jti":     jti,
+		"exp":     time.Now().Add(s.config.JWT.RefreshTokenExpiry).Unix(),
+		"iat":     time.Now().Unix(),
+		"nbf":     time.Now().Unix(),
+		"iss":     s.config.JWT.Issuer,
+		"aud":     s.config.JWT.Audience,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -253,7 +263,51 @@ func (s *AuthServiceImpl) ValidateAccessToken(tokenString string) (*JWTClaims, e
 }
 
 func (s *AuthServiceImpl) ValidateRefreshToken(tokenString string) (*JWTClaims, error) {
-	return s.ValidateAccessToken(tokenString)
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrInvalidToken
+		}
+		return []byte(s.config.JWT.Secret), nil
+	})
+
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, ErrTokenExpired
+		}
+		return nil, ErrInvalidToken
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		userID, ok := claims["user_id"].(string)
+		if !ok {
+			return nil, ErrInvalidToken
+		}
+
+		email, ok := claims["email"].(string)
+		if !ok {
+			return nil, ErrInvalidToken
+		}
+
+		role, ok := claims["role"].(string)
+		if !ok {
+			return nil, ErrInvalidToken
+		}
+
+		return &JWTClaims{
+			UserID: userID,
+			Email:  email,
+			Role:   role,
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Unix(int64(claims["exp"].(float64)), 0)),
+				IssuedAt:  jwt.NewNumericDate(time.Unix(int64(claims["iat"].(float64)), 0)),
+				NotBefore: jwt.NewNumericDate(time.Unix(int64(claims["nbf"].(float64)), 0)),
+				Issuer:    claims["iss"].(string),
+				Audience:  []string{claims["aud"].(string)},
+			},
+		}, nil
+	}
+
+	return nil, ErrInvalidToken
 }
 
 func (s *AuthServiceImpl) GetUserFromToken(tokenString string) (*models.User, error) {

@@ -49,7 +49,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
-// Login handles user authentication
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req services.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -81,7 +80,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-// RefreshToken handles token refresh
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req services.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -117,7 +115,6 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	})
 }
 
-// GetProfile returns the current user's profile
 func (h *AuthHandler) GetProfile(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -133,18 +130,12 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	})
 }
 
-// Logout handles user logout (client-side token removal)
 func (h *AuthHandler) Logout(c *gin.Context) {
-	// In a JWT-based system, logout is typically handled client-side
-	// by removing the token from storage. However, we can provide
-	// an endpoint for consistency and future token blacklisting.
-
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Logged out successfully",
+		"message": "Logged out successfully. Please remove the token from client storage.",
 	})
 }
 
-// ChangePassword handles password changes for authenticated users
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	type ChangePasswordRequest struct {
 		CurrentPassword string `json:"currentPassword" binding:"required"`
@@ -168,9 +159,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// This would require additional methods in the auth service
-	// For now, we'll return a placeholder response
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Password change endpoint - implementation pending",
+	c.JSON(http.StatusNotImplemented, gin.H{
+		"message": "Password change functionality is not yet implemented",
 	})
 }

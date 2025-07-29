@@ -117,19 +117,19 @@ golangci-lint run
 cd frontend
 
 # Instalar dependencias
-npm install
+pnpm install
 
 # Servidor de desarrollo
-npm run dev
+pnpm run dev
 
 # Build de producción
-npm run build
+pnpm run build
 
 # Tests
-npm test
+pnpm test
 
 # Linting
-npm run lint
+pnpm run lint
 ```
 
 ### Base de Datos

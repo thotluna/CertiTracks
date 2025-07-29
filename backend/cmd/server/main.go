@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"certitrack/internal/config"
 	"certitrack/internal/database"
@@ -21,8 +22,11 @@ func main() {
 		log.Fatal("Failed to load configuration:", err)
 	}
 
-	if cfg.IsProduction() {
+	switch {
+	case cfg.IsProduction():
 		gin.SetMode(gin.ReleaseMode)
+	case os.Getenv("GO_ENV") == "test":
+		gin.SetMode(gin.TestMode)
 	}
 
 	db, err := database.Connect(cfg)
@@ -128,7 +132,6 @@ func main() {
 				})
 			}
 
-			// Certifications routes
 			certifications := protected.Group("/certifications")
 			{
 				certifications.GET("", func(c *gin.Context) {
