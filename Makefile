@@ -34,7 +34,7 @@ clean:
 	@cd frontend && rm -rf .next node_modules
 
 # Build applications
-build-backend:
+build-backend: wire-gen
 	@echo "Building backend..."
 	@cd backend && go build -o bin/server cmd/server/main.go
 
@@ -44,12 +44,17 @@ build-frontend:
 
 build: build-backend build-frontend
 
+# Clean test cache
+test-clean:
+	@echo "Cleaning test cache..."
+	@cd backend && go clean -testcache
+
 # Run tests
-test-backend:
+test-backend: test-clean
 	@echo "Running backend tests..."
 	@cd backend && go test -v -race -cover ./...
 
-test-backend-integration:
+test-backend-integration: test-clean
 	@echo "Running backend integration tests..."
 	@cd backend && unset POSTGRES_TEST_PORT && go test -v -tags=integration ./...
 
@@ -94,6 +99,10 @@ db-reset:
 	@cd backend && go run cmd/migrate/main.go down
 	@$(MAKE) db-migrate
 	@$(MAKE) db-seed
+
+wire-gen:
+	@echo "Generating Wire dependencies..."
+	@cd backend && wire ./internal/di
 
 # Help
 help:
