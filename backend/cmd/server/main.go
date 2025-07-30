@@ -5,52 +5,51 @@ import (
 	"log"
 	"os"
 
-	"certitrack/internal/config"
 	"certitrack/internal/database"
-	"certitrack/internal/router"
+	"certitrack/internal/di"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	cfg, err := config.Load()
+	// Inicializar dependencias con Wire
+	deps, err := di.InitializeServer()
 	if err != nil {
-		log.Fatal("Failed to load configuration:", err)
+		log.Fatal("Failed to initialize dependencies:", err)
 	}
 
+	// Configurar modo de Gin
 	switch {
-	case cfg.IsProduction():
+	case deps.Config.IsProduction():
 		gin.SetMode(gin.ReleaseMode)
 	case os.Getenv("GO_ENV") == "test":
 		gin.SetMode(gin.TestMode)
 	}
 
-	db, err := database.Connect(cfg)
-	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
-	}
-
-	if err := database.AutoMigrate(db); err != nil {
+	// Ejecutar migraciones
+	if err := database.AutoMigrate(deps.DB); err != nil {
 		log.Fatal("Failed to run database migrations:", err)
 	}
 
-	if err := database.CreateDefaultAdmin(db); err != nil {
+	// Crear administrador por defecto
+	if err := database.CreateDefaultAdmin(deps.DB); err != nil {
 		log.Fatal("Failed to create default admin:", err)
 	}
 
-	route := gin.Default()
-	router.SetupRouter(db, cfg, route)
+	// Mostrar información del servidor
+	if os.Getenv("GO_ENV") != "test" {
+		fmt.Printf("🚀 CertiTrack API server starting on port %s\n", deps.Config.App.Port)
+		fmt.Printf("📊 Health check: http://localhost:%s/health\n", deps.Config.App.Port)
+		fmt.Printf("🔗 API base URL: http://localhost:%s/api/v1\n", deps.Config.App.Port)
+		fmt.Printf("🔐 Auth endpoints:\n")
+		fmt.Printf("   POST /api/v1/auth/register\n")
+		fmt.Printf("   POST /api/v1/auth/login\n")
+		fmt.Printf("   POST /api/v1/auth/refresh\n")
+		fmt.Printf("   GET  /api/v1/profile (protected)\n")
+	}
 
-	fmt.Printf("🚀 CertiTrack API server starting on port %s\n", cfg.App.Port)
-	fmt.Printf("📊 Health check: http://localhost:%s/health\n", cfg.App.Port)
-	fmt.Printf("🔗 API base URL: http://localhost:%s/api/v1\n", cfg.App.Port)
-	fmt.Printf("🔐 Auth endpoints:\n")
-	fmt.Printf("   POST /api/v1/auth/register\n")
-	fmt.Printf("   POST /api/v1/auth/login\n")
-	fmt.Printf("   POST /api/v1/auth/refresh\n")
-	fmt.Printf("   GET  /api/v1/profile (protected)\n")
-
-	if err := route.Run(":" + cfg.App.Port); err != nil {
+	// Iniciar el servidor
+	if err := deps.Router.Run(":" + deps.Config.App.Port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
