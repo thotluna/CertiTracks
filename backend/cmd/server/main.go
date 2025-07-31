@@ -3,11 +3,7 @@ package main
 import (
 	"certitrack/internal/database"
 	"certitrack/internal/di"
-	"certitrack/internal/handlers"
-	"certitrack/internal/middleware"
-	"certitrack/internal/repositories"
 	"certitrack/internal/router"
-	"certitrack/internal/services"
 	"certitrack/internal/validators"
 	"context"
 	"log"
@@ -72,33 +68,18 @@ func setupRouter(deps *di.ServerDependencies) *gin.Engine {
 		log.Fatal("Failed to register validators:", err)
 	}
 
-	// Configurar middlewares globales
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
-	// Configurar rutas
 	setupRoutes(r, deps)
 
 	return r
 }
 
 func setupRoutes(r *gin.Engine, deps *di.ServerDependencies) {
-	// Inicializar repositorios
-	userRepo := repositories.NewUserRepositoryImpl(deps.DB)
-
-	// Inicializar servicios
-	authService := services.NewAuthService(deps.Config, userRepo)
-
-	// Inicializar handlers
-	authHandler := handlers.NewAuthHandler(authService)
-
-	// Configurar middlewares
-	m := middleware.NewMiddleware(authService)
-
-	// Configurar rutas
 	routerDeps := &router.RouterDeps{
-		AuthHandler: authHandler,
-		Middleware:  m,
+		AuthHandler: deps.AuthHandler,
+		Middleware:  deps.Middleware,
 	}
 
 	router.SetupRouter(routerDeps, r)
