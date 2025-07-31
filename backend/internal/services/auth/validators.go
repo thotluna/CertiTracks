@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"certitrack/internal/validators"
 	"regexp"
 
 	"github.com/go-playground/validator/v10"
@@ -14,10 +13,12 @@ var (
 	specialCharRegex = regexp.MustCompile(`[!@#$%^&*]`)
 )
 
-// AuthValidators implements validator.ValidatorRegisterer for auth package
 type AuthValidators struct{}
 
-// Register registers all auth validators with the given validator instance
+func NewAuthValidators() *AuthValidators {
+	return &AuthValidators{}
+}
+
 func (v *AuthValidators) Register(validate *validator.Validate) error {
 	return validate.RegisterValidation("strong_password", validateStrongPassword)
 }
@@ -38,9 +39,4 @@ func validateStrongPassword(fl validator.FieldLevel) bool {
 		upperCaseRegex.MatchString(password) &&
 		digitRegex.MatchString(password) &&
 		specialCharRegex.MatchString(password)
-}
-
-func init() {
-	// Register auth validators with the global validator
-	validators.Register(&AuthValidators{})
 }
