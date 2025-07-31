@@ -10,17 +10,15 @@ import (
 	"certitrack/internal/config"
 	"certitrack/internal/database"
 	"certitrack/internal/handlers"
+	"certitrack/internal/middleware"
 	"certitrack/internal/repositories"
-	"certitrack/internal/router"
 	"certitrack/internal/services"
-	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-// InitializeServer inicializa todas las dependencias del servidor
 func InitializeServer() (*ServerDependencies, error) {
 	configConfig, err := config.Load()
 	if err != nil {
@@ -33,14 +31,12 @@ func InitializeServer() (*ServerDependencies, error) {
 	userRepository := repositories.NewUserRepositoryImpl(db)
 	authServiceImpl := services.NewAuthService(configConfig, userRepository)
 	authHandler := handlers.NewAuthHandler(authServiceImpl)
-	engine, err := provideRouter(configConfig, db, authHandler)
-	if err != nil {
-		return nil, err
-	}
+	middlewareMiddleware := middleware.NewMiddleware(authServiceImpl)
 	serverDependencies := &ServerDependencies{
-		Config: configConfig,
-		DB:     db,
-		Router: engine,
+		Config:      configConfig,
+		DB:          db,
+		AuthHandler: authHandler,
+		Middleware:  middlewareMiddleware,
 	}
 	return serverDependencies, nil
 }
@@ -48,28 +44,18 @@ func InitializeServer() (*ServerDependencies, error) {
 // wire.go:
 
 var (
-	// Conjunto de dependencias para autenticación
-	authDeps = wire.NewSet(handlers.NewAuthHandler, services.NewAuthService, repositories.NewUserRepositoryImpl, wire.Bind(new(services.AuthService), new(*services.AuthServiceImpl)))
+	repositorySet = wire.NewSet(repositories.NewUserRepositoryImpl)
 
-	// Conjunto de dependencias de la base de datos
-	dbDeps = wire.NewSet(config.Load, database.Connect)
+	serviceSet = wire.NewSet(services.NewAuthService, wire.Bind(new(services.AuthService), new(*services.AuthServiceImpl)))
+
+	handlerSet = wire.NewSet(handlers.NewAuthHandler)
+
+	middlewareSet = wire.NewSet(middleware.NewMiddleware)
 )
 
-// ServerDependencies contiene todas las dependencias necesarias para el servidor
 type ServerDependencies struct {
-	Config *config.Config
-	DB     *gorm.DB
-	Router *gin.Engine
-}
-
-// provideRouter crea y configura el router con sus dependencias
-func provideRouter(
-	cfg *config.Config,
-	db *gorm.DB,
-	authHandler *handlers.AuthHandler,
-) (*gin.Engine, error) {
-	r := gin.Default()
-	router.SetupRouter(db, cfg, r)
-
-	return r, nil
+	Config      *config.Config
+	DB          *gorm.DB
+	AuthHandler *handlers.AuthHandler
+	Middleware  *middleware.Middleware
 }
