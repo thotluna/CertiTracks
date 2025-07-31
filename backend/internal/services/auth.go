@@ -1,3 +1,4 @@
+// Package services contains the business logic of the application
 package services
 
 import (
@@ -40,15 +41,15 @@ type JWTClaims struct {
 
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Password string `json:"password" binding:"required,min=8,max=72"`
 }
 
 type RegisterRequest struct {
 	Email     string `json:"email" binding:"required,email"`
-	Password  string `json:"password" binding:"required,min=6"`
-	FirstName string `json:"firstName" binding:"required,min=2"`
-	LastName  string `json:"lastName" binding:"required,min=2"`
-	Phone     string `json:"phone"`
+	Password  string `json:"password" binding:"required,min=8,max=72,strong_password"`
+	FirstName string `json:"first_name" binding:"required,min=2,max=50"`
+	LastName  string `json:"last_name" binding:"required,min=2,max=50"`
+	Phone     string `json:"phone,omitempty" binding:"omitempty,min=8,max=20"`
 }
 
 type AuthResponse struct {
