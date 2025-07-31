@@ -1,17 +1,14 @@
 package router
 
 import (
-	"certitrack/internal/config"
-	"certitrack/internal/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func setupUserRoutes(rg *gin.RouterGroup, db *gorm.DB, cfg *config.Config) {
+func setupUserRoutes(rg *gin.RouterGroup, deps *RouterDeps) {
 	users := rg.Group("/users")
-	users.Use(middleware.AdminMiddleware())
+	users.Use(deps.Middleware.AdminMiddleware())
 	{
 		users.GET("", func(ctx *gin.Context) {
 			ctx.JSON(http.StatusOK, gin.H{"message": "Users"})
