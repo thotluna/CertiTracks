@@ -20,7 +20,7 @@ func TestRegister(t *testing.T) {
 		Database: config.DatabaseConfig{
 			Name:     "test_db",
 			User:     "testuser",
-			Password: "testpassword",
+			Password: "Password123!",
 			SSLMode:  "disable",
 		},
 	}
@@ -38,7 +38,7 @@ func TestRegister(t *testing.T) {
 	t.Run("should register a new user successfully", func(t *testing.T) {
 		user := testutils.TestUser{
 			Email:     generateUniqueEmail("test_register"),
-			Password:  "password123",
+			Password:  "Password123!",
 			FirstName: "Test",
 			LastName:  "User",
 		}
@@ -51,7 +51,7 @@ func TestRegister(t *testing.T) {
 	t.Run("should fail with duplicate email", func(t *testing.T) {
 		user := testutils.TestUser{
 			Email:     generateUniqueEmail("duplicate"),
-			Password:  "password123",
+			Password:  "Password123!",
 			FirstName: "Test",
 			LastName:  "User",
 		}

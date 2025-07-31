@@ -3,6 +3,7 @@ package auth_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -15,11 +16,12 @@ func TestLogin(t *testing.T) {
 	setupTestUser := func(router *testRouter) testUser {
 		user := testUser{
 			Email:     "login_test@example.com",
-			Password:  "password123",
+			Password:  "Password123!",
 			FirstName: "Login",
 			LastName:  "Test",
 		}
-		registerTestUser(t, router, user)
+		w := registerTestUser(t, router, user)
+		fmt.Println("Register response:", w.Body.String())
 		return user
 	}
 
@@ -29,6 +31,7 @@ func TestLogin(t *testing.T) {
 
 		user := setupTestUser(router)
 		response := loginTestUser(t, router, user.Email, user.Password)
+		fmt.Println(response.Body.String())
 
 		assert.Equal(t, http.StatusOK, response.Code)
 		data := getResponseData(t, response)

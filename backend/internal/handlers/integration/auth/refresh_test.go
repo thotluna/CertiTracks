@@ -16,7 +16,7 @@ func TestRefreshToken(t *testing.T) {
 	setupTestUser := func(router *testRouter) testUser {
 		user := testUser{
 			Email:     "refresh@example.com",
-			Password:  "password123",
+			Password:  "Password123!",
 			FirstName: "Refresh",
 			LastName:  "Token",
 		}

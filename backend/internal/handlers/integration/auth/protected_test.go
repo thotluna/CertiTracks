@@ -3,6 +3,7 @@ package auth_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,11 +16,12 @@ func TestProtectedRoutes(t *testing.T) {
 	setupTestUser := func(router *testRouter) testUser {
 		user := testUser{
 			Email:     "protected@example.com",
-			Password:  "password123",
+			Password:  "Password123!",
 			FirstName: "Protected",
 			LastName:  "Route",
 		}
-		registerTestUser(t, router, user)
+		w := registerTestUser(t, router, user)
+		fmt.Println("Register response:", w.Body.String())
 		return user
 	}
 
@@ -34,7 +36,9 @@ func TestProtectedRoutes(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		w := httptest.NewRecorder()
+		fmt.Println("Request:", req)
 		router.Router.ServeHTTP(w, req)
+		fmt.Println("Response:", w.Body.String())
 
 		assert.Equal(t, http.StatusOK, w.Code, "Should return 200 OK for valid token")
 

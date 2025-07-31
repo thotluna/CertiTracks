@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"certitrack/internal/middleware"
 	"certitrack/internal/repositories"
 	"certitrack/internal/services"
+	"certitrack/internal/validators"
 	"certitrack/testutils/testcontainer"
 
 	"github.com/gin-gonic/gin"
@@ -23,15 +25,15 @@ import (
 type testUser struct {
 	Email     string `json:"email"`
 	Password  string `json:"password"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
 }
 
 type testRouter struct {
-	Router          *gin.Engine
-	DB              *testcontainer.PostgresContainer
-	Middleware      *middleware.Middleware
-	AuthHandler     *handlers.AuthHandler
+	Router      *gin.Engine
+	DB          *testcontainer.PostgresContainer
+	Middleware  *middleware.Middleware
+	AuthHandler *handlers.AuthHandler
 }
 
 func setupTestRouter(t *testing.T) *testRouter {
@@ -65,6 +67,9 @@ func setupTestRouter(t *testing.T) *testRouter {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
+	if err := validators.RegisterAll(); err != nil {
+		log.Fatal("Failed to register validators:", err)
+	}
 
 	authGroup := r.Group("/api/auth")
 	{
@@ -133,7 +138,7 @@ func getResponseData(t *testing.T, w *httptest.ResponseRecorder) map[string]inte
 func getAccessToken(t *testing.T, router *testRouter) string {
 	user := testUser{
 		Email:     "test@example.com",
-		Password:  "password123",
+		Password:  "Password123!",
 		FirstName: "Test",
 		LastName:  "User",
 	}
@@ -153,7 +158,7 @@ func getAccessToken(t *testing.T, router *testRouter) string {
 func getRefreshToken(t *testing.T, router *testRouter) string {
 	user := testUser{
 		Email:     "refresh_test@example.com",
-		Password:  "password123",
+		Password:  "Password123!",
 		FirstName: "Refresh",
 		LastName:  "Test",
 	}

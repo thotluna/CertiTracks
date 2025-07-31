@@ -3,6 +3,7 @@ package testutils
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"certitrack/internal/middleware"
 	"certitrack/internal/repositories"
 	"certitrack/internal/services"
+	"certitrack/internal/validators"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -20,8 +22,8 @@ import (
 type TestUser struct {
 	Email     string `json:"email"`
 	Password  string `json:"password"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
 }
 
 func SetupTestRouter(t *testing.T, db *gorm.DB) *gin.Engine {
@@ -34,6 +36,9 @@ func SetupTestRouter(t *testing.T, db *gorm.DB) *gin.Engine {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
+	if err := validators.RegisterAll(); err != nil {
+		log.Fatal("Failed to register validators:", err)
+	}
 
 	authGroup := r.Group("/api/auth")
 	{

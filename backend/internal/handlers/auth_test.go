@@ -3,6 +3,8 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +12,7 @@ import (
 
 	"certitrack/internal/models"
 	"certitrack/internal/services"
+	"certitrack/internal/validators"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -84,6 +87,9 @@ func (m *MockAuthService) CheckPassword(password, hash string) bool {
 func setupTestRouter(handler *AuthHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
+	if err := validators.RegisterAll(); err != nil {
+		log.Fatal("Failed to register validators:", err)
+	}
 
 	auth := r.Group("/api/auth")
 	{
@@ -115,12 +121,14 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	mockService.On("Register", mock.AnythingOfType("*services.RegisterRequest")).Return(expectedResponse, nil)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"test@example.com","password":"password123","firstName":"Test","lastName":"User"}`
+	requestBody := `{"email":"test@example.com","password":"Password123!","first_name":"Test","last_name":"User"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
+	fmt.Println("Request:", req)
+	fmt.Println("Response:", w)
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusCreated, w.Code)
 
@@ -145,7 +153,7 @@ func TestAuthHandler_Register_EmailExists(t *testing.T) {
 		Return(nil, services.ErrUserExists)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"exists@example.com","password":"password123","firstName":"Test","lastName":"User"}`
+	requestBody := `{"email":"exists@example.com","password":"Password123!","first_name":"Test","last_name":"User"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -182,7 +190,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 		Return(expectedResponse, nil)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"test@example.com","password":"password123"}`
+	requestBody := `{"email":"test@example.com","password":"Password123!"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/login", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -236,7 +244,7 @@ func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 		Return(nil, services.ErrInvalidCredentials)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"test@example.com","password":"wrongpass"}`
+	requestBody := `{"email":"test@example.com","password":"WrongPass123!"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/login", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -260,7 +268,7 @@ func TestAuthHandler_Login_UserNotFound(t *testing.T) {
 		Return(nil, services.ErrUserNotFound)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"nonexistent@example.com","password":"password123"}`
+	requestBody := `{"email":"nonexistent@example.com","password":"Password123!"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/login", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -336,13 +344,13 @@ func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
 	}{
 		{
 			name:           "invalid email format",
-			requestBody:    `{"email":"invalid-email","password":"pass123","firstName":"Test","lastName":"User"}`,
+			requestBody:    `{"email":"invalid-email","password":"Password123!","firstName":"Test","lastName":"User"}`,
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Invalid request data",
 		},
 		{
 			name:           "missing email",
-			requestBody:    `{"password":"pass123","firstName":"Test","lastName":"User"}`,
+			requestBody:    `{"password":"Password123!","firstName":"Test","lastName":"User"}`,
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Invalid request data",
 		},
@@ -379,7 +387,7 @@ func TestAuthHandler_InternalServerError(t *testing.T) {
 		Return(nil, assert.AnError)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"test@example.com","password":"password123"}`
+	requestBody := `{"email":"test@example.com","password":"Password123!"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/login", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
