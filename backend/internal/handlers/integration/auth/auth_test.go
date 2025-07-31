@@ -28,8 +28,10 @@ type testUser struct {
 }
 
 type testRouter struct {
-	Router *gin.Engine
-	DB     *testcontainer.PostgresContainer
+	Router          *gin.Engine
+	DB              *testcontainer.PostgresContainer
+	Middleware      *middleware.Middleware
+	AuthHandler     *handlers.AuthHandler
 }
 
 func setupTestRouter(t *testing.T) *testRouter {
@@ -58,19 +60,21 @@ func setupTestRouter(t *testing.T) *testRouter {
 
 	userRepo := repositories.NewUserRepositoryImpl(pgContainer.DB)
 	authService := services.NewAuthService(cfg, userRepo)
+	middlewareInstance := middleware.NewMiddleware(authService)
+	authHandler := handlers.NewAuthHandler(authService)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
 
 	authGroup := r.Group("/api/auth")
 	{
-		authGroup.POST("/register", handlers.NewAuthHandler(authService).Register)
-		authGroup.POST("/login", handlers.NewAuthHandler(authService).Login)
-		authGroup.POST("/refresh", handlers.NewAuthHandler(authService).RefreshToken)
+		authGroup.POST("/register", authHandler.Register)
+		authGroup.POST("/login", authHandler.Login)
+		authGroup.POST("/refresh", authHandler.RefreshToken)
 	}
 
 	api := r.Group("/api")
-	api.Use(middleware.AuthMiddleware(authService))
+	api.Use(middlewareInstance.AuthMiddleware())
 	{
 		api.GET("/me", func(c *gin.Context) {
 			user, _ := c.Get("user")
@@ -79,8 +83,10 @@ func setupTestRouter(t *testing.T) *testRouter {
 	}
 
 	return &testRouter{
-		Router: r,
-		DB:     pgContainer,
+		Router:      r,
+		DB:          pgContainer,
+		Middleware:  middlewareInstance,
+		AuthHandler: authHandler,
 	}
 }
 

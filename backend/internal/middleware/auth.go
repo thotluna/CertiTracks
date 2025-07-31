@@ -9,7 +9,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthMiddleware(authService services.AuthService) gin.HandlerFunc {
+type Middleware struct {
+	authService services.AuthService
+}
+
+func NewMiddleware(authService services.AuthService) *Middleware {
+	return &Middleware{
+		authService: authService,
+	}
+}
+
+func (m *Middleware) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -37,7 +47,7 @@ func AuthMiddleware(authService services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		user, err := authService.GetUserFromToken(token)
+		user, err := m.authService.GetUserFromToken(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid or expired token",
@@ -54,7 +64,7 @@ func AuthMiddleware(authService services.AuthService) gin.HandlerFunc {
 	}
 }
 
-func AdminMiddleware() gin.HandlerFunc {
+func (m *Middleware) AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole, exists := c.Get("userRole")
 		if !exists {
@@ -77,8 +87,7 @@ func AdminMiddleware() gin.HandlerFunc {
 	}
 }
 
-// OptionalAuthMiddleware validates JWT tokens but doesn't require them
-func OptionalAuthMiddleware(authService services.AuthService) gin.HandlerFunc {
+func (m *Middleware) OptionalAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -97,10 +106,8 @@ func OptionalAuthMiddleware(authService services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		// Try to validate token and get user
-		user, err := authService.GetUserFromToken(token)
+		user, err := m.authService.GetUserFromToken(token)
 		if err == nil {
-			// Set user in context if token is valid
 			c.Set("user", user)
 			c.Set("userID", user.ID.String())
 			c.Set("userRole", user.Role)

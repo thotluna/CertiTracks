@@ -30,6 +30,7 @@ func SetupTestRouter(t *testing.T, db *gorm.DB) *gin.Engine {
 	userRepo := repositories.NewUserRepositoryImpl(db)
 	cfg := GetTestConfig()
 	authService := services.NewAuthService(cfg, userRepo)
+	middlewareInstance := middleware.NewMiddleware(authService)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
@@ -43,7 +44,7 @@ func SetupTestRouter(t *testing.T, db *gorm.DB) *gin.Engine {
 	}
 
 	api := r.Group("/api")
-	api.Use(middleware.AuthMiddleware(authService))
+	api.Use(middlewareInstance.AuthMiddleware())
 	{
 		api.GET("/me", func(c *gin.Context) {
 			user, _ := c.Get("user")
