@@ -1,6 +1,7 @@
-package auth
+package auth_test
 
 import (
+	"certitrack/internal/services/auth"
 	"testing"
 
 	"github.com/gin-gonic/gin/binding"
@@ -10,7 +11,7 @@ import (
 
 func TestValidateStrongPassword(t *testing.T) {
 	v, _ := binding.Validator.Engine().(*validator.Validate)
-	_ = v.RegisterValidation("strong_password", validateStrongPassword)
+	_ = v.RegisterValidation("strong_password", auth.ValidateStrongPassword)
 
 	tests := []struct {
 		name     string

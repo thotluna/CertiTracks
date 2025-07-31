@@ -1,4 +1,4 @@
-package handlers
+package handlers_test
 
 import (
 	"bytes"
@@ -10,9 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"certitrack/internal/handlers"
 	"certitrack/internal/models"
 	"certitrack/internal/services"
 	"certitrack/internal/validators"
+	"certitrack/testutils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -84,7 +86,7 @@ func (m *MockAuthService) CheckPassword(password, hash string) bool {
 	return args.Bool(0)
 }
 
-func setupTestRouter(handler *AuthHandler) *gin.Engine {
+func setupTestRouter(handler *handlers.AuthHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
 	if err := validators.RegisterAll(); err != nil {
@@ -102,13 +104,15 @@ func setupTestRouter(handler *AuthHandler) *gin.Engine {
 
 func TestAuthHandler_Register_Success(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
+
+	reqBuilder := testutils.NewRegisterRequest()
 
 	expectedUser := &models.User{
 		ID:        uuid.New(),
-		Email:     "test@example.com",
-		FirstName: "Test",
-		LastName:  "User",
+		Email:     reqBuilder.Email,
+		FirstName: reqBuilder.FirstName,
+		LastName:  reqBuilder.LastName,
 	}
 
 	expectedResponse := &services.AuthResponse{
@@ -121,7 +125,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	mockService.On("Register", mock.AnythingOfType("*services.RegisterRequest")).Return(expectedResponse, nil)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"test@example.com","password":"Password123!","first_name":"Test","last_name":"User"}`
+	requestBody := reqBuilder.ToJSON()
 
 	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -147,13 +151,14 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 
 func TestAuthHandler_Register_EmailExists(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
+	reqBuilder := testutils.NewRegisterRequest()
 
 	mockService.On("Register", mock.AnythingOfType("*services.RegisterRequest")).
 		Return(nil, services.ErrUserExists)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"exists@example.com","password":"Password123!","first_name":"Test","last_name":"User"}`
+	requestBody := reqBuilder.ToJSON()
 
 	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -171,13 +176,14 @@ func TestAuthHandler_Register_EmailExists(t *testing.T) {
 
 func TestAuthHandler_Login_Success(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
+	reqBuilder := testutils.NewRegisterRequest()
 
 	expectedUser := &models.User{
 		ID:        uuid.New(),
-		Email:     "test@example.com",
-		FirstName: "Test",
-		LastName:  "User",
+		Email:     reqBuilder.Email,
+		FirstName: reqBuilder.FirstName,
+		LastName:  reqBuilder.LastName,
 	}
 	expectedResponse := &services.AuthResponse{
 		User:         expectedUser,
@@ -190,7 +196,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 		Return(expectedResponse, nil)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"test@example.com","password":"Password123!"}`
+	requestBody := reqBuilder.ToJSON()
 
 	req, _ := http.NewRequest("POST", "/api/auth/login", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -208,7 +214,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 
 func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
 
 	expectedResponse := &services.AuthResponse{
 		AccessToken:  "new-access-token",
@@ -238,7 +244,7 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 
 func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("Login", mock.AnythingOfType("*services.LoginRequest")).
 		Return(nil, services.ErrInvalidCredentials)
@@ -262,13 +268,14 @@ func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 
 func TestAuthHandler_Login_UserNotFound(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("Login", mock.AnythingOfType("*services.LoginRequest")).
 		Return(nil, services.ErrUserNotFound)
+	reqBuilder := testutils.NewRegisterRequest()
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"nonexistent@example.com","password":"Password123!"}`
+	requestBody := reqBuilder.ToJSON()
 
 	req, _ := http.NewRequest("POST", "/api/auth/login", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -286,7 +293,7 @@ func TestAuthHandler_Login_UserNotFound(t *testing.T) {
 
 func TestAuthHandler_RefreshToken_Expired(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("RefreshToken", mock.AnythingOfType("*services.RefreshRequest")).
 		Return(nil, services.ErrTokenExpired)
@@ -310,7 +317,7 @@ func TestAuthHandler_RefreshToken_Expired(t *testing.T) {
 
 func TestAuthHandler_RefreshToken_Invalid(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("RefreshToken", mock.AnythingOfType("*services.RefreshRequest")).
 		Return(nil, services.ErrInvalidToken)
@@ -333,7 +340,7 @@ func TestAuthHandler_RefreshToken_Invalid(t *testing.T) {
 }
 
 func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
-	handler := NewAuthHandler(new(MockAuthService))
+	handler := handlers.NewAuthHandler(new(MockAuthService))
 	r := setupTestRouter(handler)
 
 	tests := []struct {
@@ -344,19 +351,19 @@ func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
 	}{
 		{
 			name:           "invalid email format",
-			requestBody:    `{"email":"invalid-email","password":"Password123!","firstName":"Test","lastName":"User"}`,
+			requestBody:    testutils.NewRegisterRequest(testutils.WithEmail("invalid-email")).ToJSON(),
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Invalid request data",
 		},
 		{
 			name:           "missing email",
-			requestBody:    `{"password":"Password123!","firstName":"Test","lastName":"User"}`,
+			requestBody:    testutils.NewRegisterRequest(testutils.WithEmail("")).ToJSON(),
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Invalid request data",
 		},
 		{
 			name:           "password too short",
-			requestBody:    `{"email":"test@example.com","password":"123","firstName":"Test","lastName":"User"}`,
+			requestBody:    testutils.NewRegisterRequest(testutils.WithPassword("short")).ToJSON(),
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Invalid request data",
 		},
@@ -381,13 +388,14 @@ func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
 
 func TestAuthHandler_InternalServerError(t *testing.T) {
 	mockService := new(MockAuthService)
-	handler := NewAuthHandler(mockService)
+	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("Login", mock.AnythingOfType("*services.LoginRequest")).
 		Return(nil, assert.AnError)
+	reqBuilder := testutils.NewRegisterRequest()
 
 	r := setupTestRouter(handler)
-	requestBody := `{"email":"test@example.com","password":"Password123!"}`
+	requestBody := reqBuilder.ToJSON()
 
 	req, _ := http.NewRequest("POST", "/api/auth/login", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -403,7 +411,7 @@ func TestAuthHandler_InternalServerError(t *testing.T) {
 }
 
 func TestAuthHandler_InvalidJSON(t *testing.T) {
-	handler := NewAuthHandler(new(MockAuthService))
+	handler := handlers.NewAuthHandler(new(MockAuthService))
 	r := setupTestRouter(handler)
 
 	tests := []struct {
