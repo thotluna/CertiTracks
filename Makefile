@@ -1,4 +1,4 @@
-.PHONY: setup dev clean build test lint docker-up docker-down db-migrate db-seed
+.PHONY: setup dev stop clean build test lint docker-up docker-down db-migrate db-seed
 
 # Setup development environment
 setup:
@@ -17,21 +17,39 @@ setup:
 	# @$(MAKE) db-seed
 	@echo "Setup complete! Run 'make dev' to start development servers."
 
+# Find process using port 8080
+PORT := 8080
+
 # Start development servers
-dev:
+dev: stop
 	@echo "Starting development environment..."
 	@docker-compose up -d postgres redis mailhog
 	@echo "Starting backend server..."
-	@cd backend && go run cmd/server/main.go &
+	@cd backend && (go run cmd/server/main.go & echo $$! > .server.pid)
+	@sleep 1
+	@echo "Backend server started on port $(PORT)"
 	# @echo "Starting frontend server..."
 	# @cd frontend && pnpm run dev
 
+# Stop development servers
+stop:
+	@echo "Stopping development environment..."
+	@docker-compose down
+	@if lsof -ti:$(PORT) >/dev/null 2>&1; then \
+		echo "Stopping process on port $(PORT)..."; \
+		lsof -ti:$(PORT) | xargs kill -9 2>/dev/null || true; \
+	fi
+	@if [ -f "backend/.server.pid" ]; then \
+		rm -f backend/.server.pid backend/.server.child.pid; \
+	fi
+
 # Clean up
-clean:
+clean: stop
 	@echo "Cleaning up..."
 	@docker-compose down -v
 	@cd backend && go clean
 	@cd frontend && rm -rf .next node_modules
+	@rm -f backend/.server.pid backend/.server.child.pid 2>/dev/null || true
 
 # Build applications
 build-backend: wire-gen
