@@ -16,18 +16,12 @@ import (
 	"certitrack/internal/repositories"
 	"certitrack/internal/services"
 	"certitrack/internal/validators"
+	"certitrack/testutils"
 	"certitrack/testutils/testcontainer"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
-
-type testUser struct {
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-}
 
 type testRouter struct {
 	Router      *gin.Engine
@@ -95,7 +89,7 @@ func setupTestRouter(t *testing.T) *testRouter {
 	}
 }
 
-func registerTestUser(t *testing.T, router *testRouter, user testUser) *httptest.ResponseRecorder {
+func registerTestUser(t *testing.T, router *testRouter, user services.RegisterRequest) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(user)
 	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -136,12 +130,7 @@ func getResponseData(t *testing.T, w *httptest.ResponseRecorder) map[string]inte
 }
 
 func getAccessToken(t *testing.T, router *testRouter) string {
-	user := testUser{
-		Email:     "test@example.com",
-		Password:  "Password123!",
-		FirstName: "Test",
-		LastName:  "User",
-	}
+	user := testutils.NewRegisterRequest().RegisterRequest
 
 	registerTestUser(t, router, user)
 
@@ -156,12 +145,7 @@ func getAccessToken(t *testing.T, router *testRouter) string {
 }
 
 func getRefreshToken(t *testing.T, router *testRouter) string {
-	user := testUser{
-		Email:     "refresh_test@example.com",
-		Password:  "Password123!",
-		FirstName: "Refresh",
-		LastName:  "Test",
-	}
+	user := testutils.NewRegisterRequest().RegisterRequest
 
 	registerTestUser(t, router, user)
 

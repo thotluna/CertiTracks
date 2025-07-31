@@ -60,7 +60,7 @@ func SetupTestRouter(t *testing.T, db *gorm.DB) *gin.Engine {
 	return r
 }
 
-func RegisterTestUser(t *testing.T, router *gin.Engine, user TestUser) *httptest.ResponseRecorder {
+func RegisterTestUser(t *testing.T, router *gin.Engine, user services.RegisterRequest) *httptest.ResponseRecorder {
 	t.Helper()
 
 	body, err := json.Marshal(user)

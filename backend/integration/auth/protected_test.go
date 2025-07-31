@@ -1,6 +1,8 @@
 package auth_test
 
 import (
+	"certitrack/internal/services"
+	"certitrack/testutils"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,13 +15,8 @@ import (
 )
 
 func TestProtectedRoutes(t *testing.T) {
-	setupTestUser := func(router *testRouter) testUser {
-		user := testUser{
-			Email:     "protected@example.com",
-			Password:  "Password123!",
-			FirstName: "Protected",
-			LastName:  "Route",
-		}
+	setupTestUser := func(router *testRouter) services.RegisterRequest {
+		user := testutils.NewRegisterRequest().RegisterRequest
 		w := registerTestUser(t, router, user)
 		fmt.Println("Register response:", w.Body.String())
 		return user

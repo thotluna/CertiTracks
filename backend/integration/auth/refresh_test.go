@@ -2,8 +2,11 @@ package auth_test
 
 import (
 	"bytes"
+	"certitrack/internal/services"
+	"certitrack/testutils"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,14 +16,10 @@ import (
 )
 
 func TestRefreshToken(t *testing.T) {
-	setupTestUser := func(router *testRouter) testUser {
-		user := testUser{
-			Email:     "refresh@example.com",
-			Password:  "Password123!",
-			FirstName: "Refresh",
-			LastName:  "Token",
-		}
-		registerTestUser(t, router, user)
+	setupTestUser := func(router *testRouter) services.RegisterRequest {
+		user := testutils.NewRegisterRequest().RegisterRequest
+		w := registerTestUser(t, router, user)
+		fmt.Println("Register response:", w.Body.String())
 		return user
 	}
 

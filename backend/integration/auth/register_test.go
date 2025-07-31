@@ -36,12 +36,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	t.Run("should register a new user successfully", func(t *testing.T) {
-		user := testutils.TestUser{
-			Email:     generateUniqueEmail("test_register"),
-			Password:  "Password123!",
-			FirstName: "Test",
-			LastName:  "User",
-		}
+		user := testutils.NewRegisterRequest(testutils.WithEmail(generateUniqueEmail("test_register"))).RegisterRequest
 
 		response := testutils.RegisterTestUser(t, router, user)
 
@@ -49,12 +44,7 @@ func TestRegister(t *testing.T) {
 	})
 
 	t.Run("should fail with duplicate email", func(t *testing.T) {
-		user := testutils.TestUser{
-			Email:     generateUniqueEmail("duplicate"),
-			Password:  "Password123!",
-			FirstName: "Test",
-			LastName:  "User",
-		}
+		user := testutils.NewRegisterRequest(testutils.WithEmail(generateUniqueEmail("duplicate"))).RegisterRequest
 
 		firstResponse := testutils.RegisterTestUser(t, router, user)
 		assert.Equal(t, http.StatusCreated, firstResponse.Code)
@@ -65,12 +55,7 @@ func TestRegister(t *testing.T) {
 	})
 
 	t.Run("should fail with invalid email format", func(t *testing.T) {
-		user := testutils.TestUser{
-			Email:     "invalid-email-format",
-			Password:  "password123",
-			FirstName: "Test",
-			LastName:  "User",
-		}
+		user := testutils.NewRegisterRequest(testutils.WithEmail("invalid-email-format")).RegisterRequest
 
 		response := testutils.RegisterTestUser(t, router, user)
 
@@ -78,12 +63,7 @@ func TestRegister(t *testing.T) {
 	})
 
 	t.Run("should fail with short password", func(t *testing.T) {
-		user := testutils.TestUser{
-			Email:     generateUniqueEmail("shortpass"),
-			Password:  "12345",
-			FirstName: "Test",
-			LastName:  "User",
-		}
+		user := testutils.NewRegisterRequest(testutils.WithPassword("short")).RegisterRequest
 
 		response := testutils.RegisterTestUser(t, router, user)
 
