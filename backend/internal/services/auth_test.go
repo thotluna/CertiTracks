@@ -163,16 +163,56 @@ func TestGetUserFromToken_UserNotFound(t *testing.T) {
 }
 
 func TestValidateToken_InvalidSignature(t *testing.T) {
-	svc, _ := newAuthService()
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T, cfg *config.Config) string
+	}{{
+		name: "different secret",
+		setup: func(t *testing.T, cfg *config.Config) string {
+			badCfg := *cfg
+			badCfg.JWT.Secret = "different-secret-key-123"
+			return generateTestToken(t, &badCfg, "test-user", time.Hour)
+		},
+	}, {
+		name: "none algorithm",
+		setup: func(t *testing.T, cfg *config.Config) string {
+			token := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{
+				"sub": "test-user",
+				"exp": time.Now().Add(time.Hour).Unix(),
+			})
+			tokenString, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+			require.NoError(t, err)
+			return tokenString
+		},
+	}, {
+		name: "empty token",
+		setup: func(t *testing.T, _ *config.Config) string {
+			return ""
+		},
+	}, {
+		name: "malformed token",
+		setup: func(t *testing.T, _ *config.Config) string {
+			return "not.a.valid.jwt"
+		},
+	}, {
+		name: "tampered token",
+		setup: func(t *testing.T, cfg *config.Config) string {
+			token := generateTestToken(t, cfg, "test-user", time.Hour)
+			// Cambiar un carácter en el token para invalidar la firma
+			return token[:len(token)-2] + "xx"
+		},
+	}}
 
-	// Create a token with a different secret
-	badCfg := testConfig()
-	badCfg.JWT.Secret = "different-secret-key-123"
-	token := generateTestToken(t, badCfg, "test-user", time.Hour)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, _ := newAuthService()
+			token := tc.setup(t, testConfig())
 
-	_, err := svc.ValidateAccessToken(token)
-	require.Error(t, err)
-	require.Equal(t, services.ErrInvalidToken, err)
+			_, err := svc.ValidateAccessToken(token)
+			require.Error(t, err)
+			require.Equal(t, services.ErrInvalidToken, err, "expected invalid token error for case: %s", tc.name)
+		})
+	}
 }
 
 func TestValidateToken_MissingClaims(t *testing.T) {
