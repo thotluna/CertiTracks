@@ -118,44 +118,44 @@ func Load() (*Config, error) {
 
 	config := &Config{
 		App: AppConfig{
-			Env:  getEnv("APP_ENV", "development"),
-			Port: getEnv("PORT", "8080"),
-			URL:  getEnv("APP_URL", "http://localhost:3000"),
+			Env:  GetEnv("APP_ENV", "development"),
+			Port: GetEnv("PORT", "8080"),
+			URL:  GetEnv("APP_URL", "http://localhost:3000"),
 		},
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			Name:     getEnv("DB_NAME", "certitrack_dev"),
-			User:     getEnv("DB_USER", "certitrack_user"),
-			Password: getEnv("DB_PASSWORD", "dev_password"),
-			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+			Host:     GetEnv("DB_HOST", "localhost"),
+			Port:     GetEnv("DB_PORT", "5432"),
+			Name:     GetEnv("DB_NAME", "certitrack_dev"),
+			User:     GetEnv("DB_USER", "certitrack_user"),
+			Password: GetEnv("DB_PASSWORD", "dev_password"),
+			SSLMode:  GetEnv("DB_SSL_MODE", "disable"),
 		},
 		Redis: RedisConfig{
-			URL:      getEnv("REDIS_URL", "redis://localhost:6379"),
-			Password: getEnv("REDIS_PASSWORD", ""),
+			URL:      GetEnv("REDIS_URL", "redis://localhost:6379"),
+			Password: GetEnv("REDIS_PASSWORD", ""),
 		},
 		JWT: JWTConfig{
-			Secret:             getEnv("JWT_SECRET", "development-jwt-secret-key-minimum-32-characters"),
-			AccessTokenExpiry:  parseDuration(getEnv("JWT_ACCESS_TOKEN_EXPIRY", "15m")),
-			RefreshTokenExpiry: parseDuration(getEnv("JWT_REFRESH_TOKEN_EXPIRY", "168h")),
-			Issuer:             getEnv("JWT_ISSUER", "certitrack-api"),
-			Audience:           getEnv("JWT_AUDIENCE", "certitrack-client"),
+			Secret:             GetEnv("JWT_SECRET", "development-jwt-secret-key-minimum-32-characters"),
+			AccessTokenExpiry:  parseDuration(GetEnv("JWT_ACCESS_TOKEN_EXPIRY", "15m")),
+			RefreshTokenExpiry: parseDuration(GetEnv("JWT_REFRESH_TOKEN_EXPIRY", "168h")),
+			Issuer:             GetEnv("JWT_ISSUER", "certitrack-api"),
+			Audience:           GetEnv("JWT_AUDIENCE", "certitrack-client"),
 		},
 		SMTP: SMTPConfig{
-			Host:     getEnv("SMTP_HOST", "localhost"),
-			Port:     parseInt(getEnv("SMTP_PORT", "1025")),
-			Username: getEnv("SMTP_USERNAME", ""),
-			Password: getEnv("SMTP_PASSWORD", ""),
-			From:     getEnv("SMTP_FROM", "CertiTrack <noreply@certitrack.local>"),
+			Host:     GetEnv("SMTP_HOST", "localhost"),
+			Port:     parseInt(GetEnv("SMTP_PORT", "1025")),
+			Username: GetEnv("SMTP_USERNAME", ""),
+			Password: GetEnv("SMTP_PASSWORD", ""),
+			From:     GetEnv("SMTP_FROM", "CertiTrack <noreply@certitrack.local>"),
 		},
 		Storage: StorageConfig{
-			Root:        getEnv("STORAGE_ROOT", "./storage"),
-			MaxSizeMB:   parseInt(getEnv("MAX_FILE_SIZE_MB", "10")),
+			Root:        GetEnv("STORAGE_ROOT", "./storage"),
+			MaxSizeMB:   parseInt(GetEnv("MAX_FILE_SIZE_MB", "10")),
 			AllowedExts: []string{".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".gif"},
 		},
 		Logger: LoggerConfig{
-			Level:         getEnv("LOG_LEVEL", "info"),
-			EnableMetrics: parseBool(getEnv("ENABLE_METRICS", "false")),
+			Level:         GetEnv("LOG_LEVEL", "info"),
+			EnableMetrics: parseBool(GetEnv("ENABLE_METRICS", "false")),
 		},
 	}
 
@@ -206,8 +206,7 @@ func (c *Config) IsProduction() bool {
 	return c.App.Env == "production"
 }
 
-// Helper functions
-func getEnv(key, defaultValue string) string {
+func GetEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}

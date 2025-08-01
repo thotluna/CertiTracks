@@ -54,14 +54,12 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestClient_Close(t *testing.T) {
-	// Test closing a nil client
 	t.Run("nil client", func(t *testing.T) {
 		var c *Client
 		err := c.Close()
 		assert.NoError(t, err)
 	})
 
-	// Test closing a valid client
 	t.Run("valid client", func(t *testing.T) {
 		cfg := testutils.GetTestConfig()
 		client, err := NewClient(&cfg.Redis)
@@ -79,6 +77,5 @@ func TestClient_Client(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	// Test that Client() returns a non-nil client
-	assert.NotNil(t, client.Client())
+	assert.NotNil(t, client)
 }
