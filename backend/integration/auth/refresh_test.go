@@ -2,11 +2,9 @@ package auth_test
 
 import (
 	"bytes"
-	"certitrack/internal/services"
 	"certitrack/testutils"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,51 +14,68 @@ import (
 )
 
 func TestRefreshToken(t *testing.T) {
-	setupTestUser := func(router *testRouter) services.RegisterRequest {
-		user := testutils.NewRegisterRequest().RegisterRequest
-		w := registerTestUser(t, router, user)
-		fmt.Println("Register response:", w.Body.String())
-		return user
-	}
 
 	t.Run("should refresh token successfully", func(t *testing.T) {
-		router := setupTestRouter(t)
-		defer router.DB.Teardown(context.Background())
+		rtr := setupTestRouter(t)
+		defer rtr.DB.Teardown(context.Background())
 
-		setupTestUser(router)
-		refreshToken := getRefreshToken(t, router)
+		user := testutils.NewRegisterRequest().RegisterRequest
+		registerResponse := registerTestUser(t, rtr, user)
+
+		assert.Equal(t, http.StatusCreated, registerResponse.Code, "User registration should succeed")
+
+		loginResponse := loginTestUser(t, rtr, user.Email, user.Password)
+		if loginResponse.Code != http.StatusOK {
+			t.Logf("Login failed with status: %d, body: %s", loginResponse.Code, loginResponse.Body.String())
+		}
+		require.Equal(t, http.StatusOK, loginResponse.Code, "Login should succeed")
+
+		var loginResp map[string]interface{}
+		err := json.Unmarshal(loginResponse.Body.Bytes(), &loginResp)
+
+		require.NoError(t, err, "Failed to parse login response")
+
+		loginDataResp, ok := loginResp["data"].(map[string]interface{})
+		require.True(t, ok, "Login response should contain data object")
+
+		refreshToken, ok := loginDataResp["refresh-token"].(string)
+		require.True(t, ok, "Refresh token should be present in login response")
+		require.NotEmpty(t, refreshToken, "Refresh token should not be empty")
 
 		refreshData := map[string]string{
-			"refreshToken": refreshToken,
+			"refresh_token": refreshToken,
 		}
 
-		body, _ := json.Marshal(refreshData)
-		req, _ := http.NewRequest("POST", "/api/auth/refresh", bytes.NewBuffer(body))
+		body, err := json.Marshal(refreshData)
+		require.NoError(t, err, "Failed to marshal refresh data")
+
+		req, err := http.NewRequest("POST", "/api/auth/refresh", bytes.NewBuffer(body))
+		require.NoError(t, err, "Failed to create request")
 		req.Header.Set("Content-Type", "application/json")
 
 		w := httptest.NewRecorder()
-		router.Router.ServeHTTP(w, req)
+		rtr.Router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code, "Should return 200 OK for valid refresh token")
 
 		var response map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &response)
+		err = json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err, "Failed to parse response body")
 
+		require.Contains(t, response, "data", "Response should contain 'data' field")
 		data, ok := response["data"].(map[string]interface{})
-		require.True(t, ok, "Response should contain data object")
-
-		assert.NotEmpty(t, data["accessToken"], "New access token should be present in response")
-		assert.NotEmpty(t, data["refreshToken"], "New refresh token should be present in response")
-		assert.NotEqual(t, refreshToken, data["refreshToken"], "New refresh token should be different from the old one")
+		require.True(t, ok, "Response data should be an object")
+		assert.NotEmpty(t, data["access-token"], "New access token should be present in response")
+		assert.NotEmpty(t, data["refresh-token"], "New refresh token should be present in response")
+		assert.NotEqual(t, refreshToken, data["refresh-token"], "New refresh token should be different from the old one")
 	})
 
 	t.Run("should fail with invalid refresh token", func(t *testing.T) {
-		router := setupTestRouter(t)
-		defer router.DB.Teardown(context.Background())
+		rtr := setupTestRouter(t)
+		defer rtr.DB.Teardown(context.Background())
 
 		refreshData := map[string]string{
-			"refreshToken": "invalid.refresh.token",
+			"refresh_token": "invalid.refresh.token",
 		}
 
 		body, _ := json.Marshal(refreshData)
@@ -68,7 +83,7 @@ func TestRefreshToken(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 
 		w := httptest.NewRecorder()
-		router.Router.ServeHTTP(w, req)
+		rtr.Router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code, "Should return 401 Unauthorized for invalid refresh token")
 

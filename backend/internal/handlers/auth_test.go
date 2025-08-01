@@ -3,7 +3,6 @@ package handlers_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -131,8 +130,6 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	fmt.Println("Request:", req)
-	fmt.Println("Response:", w)
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusCreated, w.Code)
 
@@ -144,7 +141,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	data := response["data"].(map[string]interface{})
 	userData := data["user"].(map[string]interface{})
 	assert.Equal(t, expectedUser.Email, userData["email"])
-	assert.Equal(t, expectedResponse.AccessToken, data["accessToken"])
+	assert.Equal(t, expectedResponse.AccessToken, data["access-token"])
 
 	mockService.AssertExpectations(t)
 }
@@ -226,7 +223,7 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 		Return(expectedResponse, nil)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"refreshToken":"old-refresh-token"}`
+	requestBody := `{"refresh_token":"old-refresh-token"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/refresh", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -299,7 +296,7 @@ func TestAuthHandler_RefreshToken_Expired(t *testing.T) {
 		Return(nil, services.ErrTokenExpired)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"refreshToken":"expired-token"}`
+	requestBody := `{"refresh_token":"expired-token"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/refresh", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -323,7 +320,7 @@ func TestAuthHandler_RefreshToken_Invalid(t *testing.T) {
 		Return(nil, services.ErrInvalidToken)
 
 	r := setupTestRouter(handler)
-	requestBody := `{"refreshToken":"invalid-token"}`
+	requestBody := `{"refresh_token":"invalid-token"}`
 
 	req, _ := http.NewRequest("POST", "/api/auth/refresh", bytes.NewBufferString(requestBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -436,7 +433,7 @@ func TestAuthHandler_InvalidJSON(t *testing.T) {
 			name:        "invalid json refresh",
 			url:         "/api/auth/refresh",
 			method:      "POST",
-			requestBody: `{"refreshToken":"`,
+			requestBody: `{"refresh_token":"`,
 		},
 	}
 

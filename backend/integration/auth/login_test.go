@@ -1,48 +1,45 @@
 package auth_test
 
 import (
-	"certitrack/internal/services"
 	"certitrack/testutils"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLogin(t *testing.T) {
-	setupTestUser := func(router *testRouter) services.RegisterRequest {
-		user := testutils.NewRegisterRequest(testutils.WithEmail("login_test@example.com")).RegisterRequest
-		w := registerTestUser(t, router, user)
-		fmt.Println("Register response:", w.Body.String())
-		return user
-	}
-
 	t.Run("should login with valid credentials", func(t *testing.T) {
-		router := setupTestRouter(t)
-		defer router.DB.Teardown(context.Background())
+		rtr := setupTestRouter(t)
+		defer rtr.DB.Teardown(context.Background())
 
-		user := setupTestUser(router)
-		response := loginTestUser(t, router, user.Email, user.Password)
-		fmt.Println(response.Body.String())
+		user := testutils.NewRegisterRequest(
+			testutils.WithEmail(GenerateUniqueEmail("login_test")),
+			testutils.WithPassword("ValidPass123!"),
+		).RegisterRequest
+		registerTestUser(t, rtr, user)
+
+		response := loginTestUser(t, rtr, user.Email, "ValidPass123!")
 
 		assert.Equal(t, http.StatusOK, response.Code)
 		data := getResponseData(t, response)
-		assert.NotEmpty(t, data["accessToken"], "Access token should not be empty")
-		assert.NotEmpty(t, data["refreshToken"], "Refresh token should not be empty")
+		assert.NotEmpty(t, data["access-token"], "Access token should not be empty")
+		assert.NotEmpty(t, data["refresh-token"], "Refresh token should not be empty")
 	})
 
 	t.Run("should fail with invalid password", func(t *testing.T) {
+		rtr := setupTestRouter(t)
+		defer rtr.DB.Teardown(context.Background())
 
-		router := setupTestRouter(t)
-		defer router.DB.Teardown(context.Background())
-
-		user := setupTestUser(router)
-		response := loginTestUser(t, router, user.Email, "wrongpassword")
+		user := testutils.NewRegisterRequest(
+			testutils.WithEmail(GenerateUniqueEmail("login_test")),
+			testutils.WithPassword("ValidPass123!"),
+		).RegisterRequest
+		registerTestUser(t, rtr, user)
+		response := loginTestUser(t, rtr, user.Email, "wrongpassword")
 
 		assert.Equal(t, http.StatusUnauthorized, response.Code)
 
@@ -52,12 +49,12 @@ func TestLogin(t *testing.T) {
 		assert.Contains(t, responseBody, "error", "Error message should be present in response")
 	})
 
-	t.Run("should fail with non-existent email", func(t *testing.T) {
-		router := setupTestRouter(t)
-		defer router.DB.Teardown(context.Background())
+	t.Run("should fail with non-existent user", func(t *testing.T) {
+		rtr := setupTestRouter(t)
+		defer rtr.DB.Teardown(context.Background())
 
-		nonExistentEmail := "nonexistent_" + time.Now().Format("20060102150405") + "@example.com"
-		response := loginTestUser(t, router, nonExistentEmail, "password123")
+		nonExistentEmail := GenerateUniqueEmail("nonexistent")
+		response := loginTestUser(t, rtr, nonExistentEmail, "password123")
 
 		assert.Equal(t, http.StatusUnauthorized, response.Code)
 

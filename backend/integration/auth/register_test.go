@@ -1,42 +1,22 @@
 package auth_test
 
 import (
-	"context"
 	"net/http"
 	"testing"
-	"time"
 
-	"certitrack/internal/config"
 	"certitrack/testutils"
-	"certitrack/testutils/testcontainer"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRegister(t *testing.T) {
-	ctx := context.Background()
-	testCfg := &config.Config{
-		Database: config.DatabaseConfig{
-			Name:     "test_db",
-			User:     "testuser",
-			Password: "Password123!",
-			SSLMode:  "disable",
-		},
-	}
-
-	pgContainer, err := testcontainer.SetupPostgres(ctx, testCfg)
-	require.NoError(t, err, "Failed to setup postgres container")
-	defer pgContainer.Teardown(ctx)
+	pgContainer, cleanup := SetupTestDB(t)
+	defer cleanup()
 
 	router := testutils.SetupTestRouter(t, pgContainer.DB)
 
-	generateUniqueEmail := func(prefix string) string {
-		return prefix + "_" + time.Now().Format("20060102150405") + "@example.com"
-	}
-
 	t.Run("should register a new user successfully", func(t *testing.T) {
-		user := testutils.NewRegisterRequest(testutils.WithEmail(generateUniqueEmail("test_register"))).RegisterRequest
+		user := testutils.NewRegisterRequest(testutils.WithEmail(GenerateUniqueEmail("test_register"))).RegisterRequest
 
 		response := testutils.RegisterTestUser(t, router, user)
 
@@ -44,7 +24,7 @@ func TestRegister(t *testing.T) {
 	})
 
 	t.Run("should fail with duplicate email", func(t *testing.T) {
-		user := testutils.NewRegisterRequest(testutils.WithEmail(generateUniqueEmail("duplicate"))).RegisterRequest
+		user := testutils.NewRegisterRequest(testutils.WithEmail(GenerateUniqueEmail("duplicate"))).RegisterRequest
 
 		firstResponse := testutils.RegisterTestUser(t, router, user)
 		assert.Equal(t, http.StatusCreated, firstResponse.Code)
