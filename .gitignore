@@ -123,3 +123,9 @@ backups/
 # Test files
 test-results/
 playwright-report/
+
+coverage/
+coverage-html/
+coverage-lcov/
+coverage.*
+certitrack-server

@@ -70,12 +70,12 @@ test-clean:
 test-backend: test-clean test-backend-unit test-backend-integration
 
 test-backend-unit: test-clean
-	@echo "Running unit tests..."
-	@cd backend && go test -short -v ./internal/...
+	@echo "Running backend unit tests..."
+	@cd backend && APP_ENV=test go test -short -v ./...
 
 test-backend-integration: test-clean
 	@echo "Running backend integration tests..."
-	@cd backend && unset POSTGRES_TEST_PORT && go test -v -tags=integration ./integration/...
+	@cd backend && APP_ENV=test go test -run Integration -v ./...
 
 test-frontend:
 	@echo "Running frontend tests..."

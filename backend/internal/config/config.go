@@ -1,8 +1,12 @@
+// Package config provides configuration management for the application.
+// It handles loading and validating environment variables from .env files
+// and provides typed access to configuration values.
 package config
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -67,8 +71,49 @@ type LoggerConfig struct {
 }
 
 func Load() (*Config, error) {
-	if err := godotenv.Load(); err != nil {
-		fmt.Println("No .env file found, using environment variables")
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "development"
+	}
+
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("error getting current directory: %v", err)
+	}
+
+	rootDir := currentDir
+	backendDir := rootDir
+	if filepath.Base(rootDir) == "backend" {
+		rootDir = filepath.Dir(rootDir)
+	} else {
+		backendDir = filepath.Join(rootDir, "backend")
+	}
+
+	envPath := filepath.Join(rootDir, ".env")
+	fmt.Printf("Looking for .env at: %s\n", envPath)
+
+	if _, err := os.Stat(envPath); err == nil {
+		fmt.Printf("Loading .env from: %s\n", envPath)
+		if err := godotenv.Load(envPath); err != nil {
+			return nil, fmt.Errorf("error loading %s: %v", envPath, err)
+		}
+	} else {
+		fmt.Printf("No .env file found at %s, using environment variables\n", envPath)
+	}
+
+	envFilePath := filepath.Join(rootDir, fmt.Sprintf(".env.%s", env))
+	if _, err := os.Stat(envFilePath); err == nil {
+		if err := godotenv.Overload(envFilePath); err != nil {
+			return nil, fmt.Errorf("error loading %s: %v", envFilePath, err)
+		}
+	}
+
+	localEnvPath := filepath.Join(backendDir, ".env.local")
+	if _, err := os.Stat(localEnvPath); err == nil {
+		fmt.Printf("Loading local environment file: %s\n", localEnvPath)
+		if err := godotenv.Overload(localEnvPath); err != nil {
+			return nil, fmt.Errorf("error loading %s: %v", localEnvPath, err)
+		}
 	}
 
 	config := &Config{
