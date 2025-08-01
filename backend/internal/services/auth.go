@@ -54,13 +54,13 @@ type RegisterRequest struct {
 
 type AuthResponse struct {
 	User         *models.User `json:"user"`
-	AccessToken  string       `json:"accessToken"`
-	RefreshToken string       `json:"refreshToken"`
+	AccessToken  string       `json:"access-token"`
+	RefreshToken string       `json:"refresh-token"`
 	ExpiresAt    time.Time    `json:"expiresAt"`
 }
 
 type RefreshRequest struct {
-	RefreshToken string `json:"refreshToken" binding:"required"`
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
 var (

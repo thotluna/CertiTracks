@@ -20,16 +20,16 @@ func NewAuthValidators() *AuthValidators {
 }
 
 func (v *AuthValidators) Register(validate *validator.Validate) error {
-	return validate.RegisterValidation("strong_password", validateStrongPassword)
+	return validate.RegisterValidation("strong_password", ValidateStrongPassword)
 }
 
-// validateStrongPassword checks if a password meets the following criteria:
+// ValidateStrongPassword checks if a password meets the following criteria:
 // - At least 8 characters long
 // - Contains at least one lowercase letter
 // - Contains at least one uppercase letter
 // - Contains at least one digit
 // - Contains at least one special character (!@#$%^&*)
-func validateStrongPassword(fl validator.FieldLevel) bool {
+func ValidateStrongPassword(fl validator.FieldLevel) bool {
 	password := fl.Field().String()
 	if len(password) < 8 {
 		return false

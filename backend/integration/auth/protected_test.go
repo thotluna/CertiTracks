@@ -1,9 +1,9 @@
 package auth_test
 
 import (
+	"certitrack/testutils"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,32 +13,21 @@ import (
 )
 
 func TestProtectedRoutes(t *testing.T) {
-	setupTestUser := func(router *testRouter) testUser {
-		user := testUser{
-			Email:     "protected@example.com",
-			Password:  "Password123!",
-			FirstName: "Protected",
-			LastName:  "Route",
-		}
-		w := registerTestUser(t, router, user)
-		fmt.Println("Register response:", w.Body.String())
-		return user
-	}
 
 	t.Run("should access protected route with valid token", func(t *testing.T) {
-		router := setupTestRouter(t)
-		defer router.DB.Teardown(context.Background())
+		rtr := setupTestRouter(t)
+		defer rtr.DB.Teardown(context.Background())
 
-		setupTestUser(router)
-		token := getAccessToken(t, router)
+		user := testutils.NewRegisterRequest().RegisterRequest
+		registerTestUser(t, rtr, user)
+		loginTestUser(t, rtr, user.Email, user.Password)
+		token := getTokens(t, rtr)
 
 		req, _ := http.NewRequest("GET", "/api/me", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
 		w := httptest.NewRecorder()
-		fmt.Println("Request:", req)
-		router.Router.ServeHTTP(w, req)
-		fmt.Println("Response:", w.Body.String())
+		rtr.Router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code, "Should return 200 OK for valid token")
 
@@ -51,13 +40,13 @@ func TestProtectedRoutes(t *testing.T) {
 	})
 
 	t.Run("should reject request without token", func(t *testing.T) {
-		router := setupTestRouter(t)
-		defer router.DB.Teardown(context.Background())
+		rtr := setupTestRouter(t)
+		defer rtr.DB.Teardown(context.Background())
 
 		req, _ := http.NewRequest("GET", "/api/me", nil)
 
 		w := httptest.NewRecorder()
-		router.Router.ServeHTTP(w, req)
+		rtr.Router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code, "Should return 401 Unauthorized without token")
 
@@ -68,14 +57,14 @@ func TestProtectedRoutes(t *testing.T) {
 	})
 
 	t.Run("should reject request with invalid token", func(t *testing.T) {
-		router := setupTestRouter(t)
-		defer router.DB.Teardown(context.Background())
+		rtr := setupTestRouter(t)
+		defer rtr.DB.Teardown(context.Background())
 
 		req, _ := http.NewRequest("GET", "/api/me", nil)
 		req.Header.Set("Authorization", "Bearer invalid.token.here")
 
 		w := httptest.NewRecorder()
-		router.Router.ServeHTTP(w, req)
+		rtr.Router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code, "Should return 401 Unauthorized with invalid token")
 

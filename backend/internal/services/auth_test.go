@@ -8,6 +8,7 @@ import (
 	"certitrack/internal/models"
 	"certitrack/internal/repositories"
 	"certitrack/internal/services"
+	"certitrack/testutils"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -35,12 +36,13 @@ func newAuthService() (services.AuthService, *repositories.MockUserRepository) {
 
 func TestRegister_Success(t *testing.T) {
 	svc, repo := newAuthService()
+	reqBuilder := testutils.NewRegisterRequest()
 
 	req := &services.RegisterRequest{
-		Email:     "alice@example.com",
-		Password:  "s3cr3tPwd",
-		FirstName: "Alice",
-		LastName:  "Wonder",
+		Email:     reqBuilder.Email,
+		Password:  reqBuilder.Password,
+		FirstName: reqBuilder.FirstName,
+		LastName:  reqBuilder.LastName,
 	}
 
 	resp, err := svc.Register(req)
@@ -54,57 +56,46 @@ func TestRegister_Success(t *testing.T) {
 
 func TestRegister_EmailExists(t *testing.T) {
 	svc, repo := newAuthService()
+	reqBuilder := testutils.NewRegisterRequest()
 	// Seed existing user
-	_ = repo.CreateUser(&models.User{Email: "taken@mail.com", Password: "hash", IsActive: true})
+	_ = repo.CreateUser(&models.User{Email: reqBuilder.Email, Password: reqBuilder.Password, IsActive: true})
 
-	_, err := svc.Register(&services.RegisterRequest{
-		Email:     "taken@mail.com",
-		Password:  "pwd",
-		FirstName: "T",
-		LastName:  "K",
-	})
+	_, err := svc.Register(&reqBuilder.RegisterRequest)
 	require.ErrorIs(t, err, services.ErrUserExists)
 }
 
 func TestLogin_Success(t *testing.T) {
 	svc, _ := newAuthService()
-	// Create user via register to ensure hashed password stored
-	_, _ = svc.Register(&services.RegisterRequest{
-		Email:     "bob@mail.com",
-		Password:  "pw12345",
-		FirstName: "Bob",
-		LastName:  "Builder",
-	})
+	reqBuilder := testutils.NewRegisterRequest()
+	_, _ = svc.Register(&reqBuilder.RegisterRequest)
 
-	resp, err := svc.Login(&services.LoginRequest{Email: "bob@mail.com", Password: "pw12345"})
+	resp, err := svc.Login(&services.LoginRequest{Email: reqBuilder.Email, Password: reqBuilder.Password})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.Equal(t, "bob@mail.com", resp.User.Email)
+	require.Equal(t, reqBuilder.Email, resp.User.Email)
 }
 
 func TestLogin_InvalidPassword(t *testing.T) {
 	svc, _ := newAuthService()
-	_, _ = svc.Register(&services.RegisterRequest{Email: "eve@mail.com", Password: "correct", FirstName: "Eve", LastName: "H"})
+	reqBuilder := testutils.NewRegisterRequest()
+	_, _ = svc.Register(&reqBuilder.RegisterRequest)
 
-	_, err := svc.Login(&services.LoginRequest{Email: "eve@mail.com", Password: "wrong"})
+	_, err := svc.Login(&services.LoginRequest{Email: reqBuilder.Email, Password: "wrong-password"})
 	require.ErrorIs(t, err, services.ErrInvalidCredentials)
 }
 
 func TestLogin_UserNotFound(t *testing.T) {
 	svc, _ := newAuthService()
+	reqBuilder := testutils.NewRegisterRequest()
 
-	_, err := svc.Login(&services.LoginRequest{Email: "ghost@mail.com", Password: "pwd"})
+	_, err := svc.Login(&services.LoginRequest{Email: "nonexistent-" + reqBuilder.Email, Password: reqBuilder.Password})
 	require.ErrorIs(t, err, services.ErrUserNotFound)
 }
 
 func TestRefreshToken_Success(t *testing.T) {
 	svc, _ := newAuthService()
-	regResp, _ := svc.Register(&services.RegisterRequest{
-		Email:     "refresh@test.com",
-		Password:  "pass123",
-		FirstName: "Refresh",
-		LastName:  "Test",
-	})
+	reqBuilder := testutils.NewRegisterRequest()
+	regResp, _ := svc.Register(&reqBuilder.RegisterRequest)
 
 	refreshReq := &services.RefreshRequest{RefreshToken: regResp.RefreshToken}
 	refreshResp, err := svc.RefreshToken(refreshReq)
@@ -134,12 +125,8 @@ func TestRefreshToken_ExpiredToken(t *testing.T) {
 
 func TestValidateToken_Valid(t *testing.T) {
 	svc, _ := newAuthService()
-	regResp, _ := svc.Register(&services.RegisterRequest{
-		Email:     "validate@test.com",
-		Password:  "pass123",
-		FirstName: "Validate",
-		LastName:  "Test",
-	})
+	reqBuilder := testutils.NewRegisterRequest()
+	regResp, _ := svc.Register(&reqBuilder.RegisterRequest)
 
 	claims, err := svc.ValidateAccessToken(regResp.AccessToken)
 	require.NoError(t, err)
@@ -155,16 +142,12 @@ func TestValidateToken_Invalid(t *testing.T) {
 
 func TestGetUserFromToken_Success(t *testing.T) {
 	svc, _ := newAuthService()
-	regResp, _ := svc.Register(&services.RegisterRequest{
-		Email:     "getuser@test.com",
-		Password:  "pass123",
-		FirstName: "Get",
-		LastName:  "User",
-	})
+	reqBuilder := testutils.NewRegisterRequest()
+	regResp, _ := svc.Register(&reqBuilder.RegisterRequest)
 
 	user, err := svc.GetUserFromToken(regResp.AccessToken)
 	require.NoError(t, err)
-	require.Equal(t, "getuser@test.com", user.Email)
+	require.Equal(t, reqBuilder.Email, user.Email)
 }
 
 func TestGetUserFromToken_UserNotFound(t *testing.T) {
@@ -180,16 +163,56 @@ func TestGetUserFromToken_UserNotFound(t *testing.T) {
 }
 
 func TestValidateToken_InvalidSignature(t *testing.T) {
-	svc, _ := newAuthService()
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T, cfg *config.Config) string
+	}{{
+		name: "different secret",
+		setup: func(t *testing.T, cfg *config.Config) string {
+			badCfg := *cfg
+			badCfg.JWT.Secret = "different-secret-key-123"
+			return generateTestToken(t, &badCfg, "test-user", time.Hour)
+		},
+	}, {
+		name: "none algorithm",
+		setup: func(t *testing.T, cfg *config.Config) string {
+			token := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{
+				"sub": "test-user",
+				"exp": time.Now().Add(time.Hour).Unix(),
+			})
+			tokenString, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+			require.NoError(t, err)
+			return tokenString
+		},
+	}, {
+		name: "empty token",
+		setup: func(t *testing.T, _ *config.Config) string {
+			return ""
+		},
+	}, {
+		name: "malformed token",
+		setup: func(t *testing.T, _ *config.Config) string {
+			return "not.a.valid.jwt"
+		},
+	}, {
+		name: "tampered token",
+		setup: func(t *testing.T, cfg *config.Config) string {
+			token := generateTestToken(t, cfg, "test-user", time.Hour)
+			// Cambiar un carácter en el token para invalidar la firma
+			return token[:len(token)-2] + "xx"
+		},
+	}}
 
-	// Create a token with a different secret
-	badCfg := testConfig()
-	badCfg.JWT.Secret = "different-secret-key-123"
-	token := generateTestToken(t, badCfg, "test-user", time.Hour)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, _ := newAuthService()
+			token := tc.setup(t, testConfig())
 
-	_, err := svc.ValidateAccessToken(token)
-	require.Error(t, err)
-	require.Equal(t, services.ErrInvalidToken, err)
+			_, err := svc.ValidateAccessToken(token)
+			require.Error(t, err)
+			require.Equal(t, services.ErrInvalidToken, err, "expected invalid token error for case: %s", tc.name)
+		})
+	}
 }
 
 func TestValidateToken_MissingClaims(t *testing.T) {

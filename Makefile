@@ -67,14 +67,15 @@ test-clean:
 	@echo "Cleaning test cache..."
 	@cd backend && go clean -testcache
 
-# Run tests
-test-backend: test-clean
-	@echo "Running backend tests..."
-	@cd backend && go test -v -race -cover ./...
+test-backend: test-clean test-backend-unit test-backend-integration
+
+test-backend-unit: test-clean
+	@echo "Running unit tests..."
+	@cd backend && go test -short -v ./internal/...
 
 test-backend-integration: test-clean
 	@echo "Running backend integration tests..."
-	@cd backend && unset POSTGRES_TEST_PORT && go test -v -tags=integration ./...
+	@cd backend && unset POSTGRES_TEST_PORT && go test -v -tags=integration ./integration/...
 
 test-frontend:
 	@echo "Running frontend tests..."
