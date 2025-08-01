@@ -19,6 +19,10 @@ func GetTestConfig() *config.Config {
 			Password: "testpassword",
 			SSLMode:  "disable",
 		},
+		Redis: config.RedisConfig{
+			URL:      "redis://localhost:6379/0",
+			Password: "dev_redis_password",
+		},
 		JWT: config.JWTConfig{
 			Secret:             "test-secret-key",
 			AccessTokenExpiry:  3600,  // 1 hora
