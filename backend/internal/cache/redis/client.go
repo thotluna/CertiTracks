@@ -10,12 +10,10 @@ import (
 	"certitrack/internal/config"
 )
 
-// Client wraps a Redis client with our custom configuration.
 type Client struct {
 	client *redis.Client
 }
 
-// NewClient creates a new Redis client with the provided configuration.
 func NewClient(cfg *config.RedisConfig) (*Client, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
@@ -42,8 +40,6 @@ func NewClient(cfg *config.RedisConfig) (*Client, error) {
 	return &Client{client: client}, nil
 }
 
-// Close closes the Redis client connection.
-// It is safe to call Close on a nil Client.
 func (c *Client) Close() error {
 	if c == nil || c.client == nil {
 		return nil
@@ -51,8 +47,9 @@ func (c *Client) Close() error {
 	return c.client.Close()
 }
 
-// Client returns the underlying Redis client.
-// This method is primarily for testing purposes.
-func (c *Client) Client() *redis.Client {
-	return c.client
+func (c *Client) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd {
+	return c.client.Set(ctx, key, value, expiration)
+}
+func (c *Client) Exists(ctx context.Context, keys ...string) *redis.IntCmd {
+	return c.client.Exists(ctx, keys...)
 }

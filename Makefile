@@ -67,15 +67,15 @@ test-clean:
 	@echo "Cleaning test cache..."
 	@cd backend && go clean -testcache
 
-test-backend: test-clean test-backend-unit test-backend-integration
+test-backend: test-clean test-bu test-bi
 
-test-backend-unit: test-clean
+test-bu: test-clean
 	@echo "Running backend unit tests..."
-	@cd backend && APP_ENV=test go test -short -v ./...
+	@cd backend && APP_ENV=test go test -short -v ./internal/...
 
-test-backend-integration: test-clean
+test-bi: test-clean
 	@echo "Running backend integration tests..."
-	@cd backend && APP_ENV=test go test -run Integration -v ./...
+	@cd backend && APP_ENV=test go test -run Integration -v ./integration/...
 
 test-frontend:
 	@echo "Running frontend tests..."

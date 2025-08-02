@@ -7,6 +7,7 @@
 package di
 
 import (
+	"certitrack/internal/cache/redis"
 	"certitrack/internal/config"
 	"certitrack/internal/database"
 	"certitrack/internal/handlers"
@@ -29,7 +30,13 @@ func InitializeServer() (*ServerDependencies, error) {
 		return nil, err
 	}
 	userRepository := repositories.NewUserRepositoryImpl(db)
-	authServiceImpl := services.NewAuthService(configConfig, userRepository)
+	redisConfig := provideRedisConfig(configConfig)
+	client, err := redis.NewClient(redisConfig)
+	if err != nil {
+		return nil, err
+	}
+	tokenRepository := repositories.NewTokenRepository(client)
+	authServiceImpl := services.NewAuthService(configConfig, userRepository, tokenRepository)
 	authHandler := handlers.NewAuthHandler(authServiceImpl)
 	middlewareMiddleware := middleware.NewMiddleware(authServiceImpl)
 	serverDependencies := &ServerDependencies{
@@ -43,7 +50,17 @@ func InitializeServer() (*ServerDependencies, error) {
 
 // wire.go:
 
+func provideRedisConfig(cfg *config.Config) *config.RedisConfig {
+	return &cfg.Redis
+}
+
 var (
+	redisClientSet = wire.NewSet(
+		provideRedisConfig, redis.NewClient, wire.Bind(new(repositories.RedisClient), new(*redis.Client)),
+	)
+
+	tokenRepositorySet = wire.NewSet(repositories.NewTokenRepository)
+
 	repositorySet = wire.NewSet(repositories.NewUserRepositoryImpl)
 
 	serviceSet = wire.NewSet(services.NewAuthService, wire.Bind(new(services.AuthService), new(*services.AuthServiceImpl)))

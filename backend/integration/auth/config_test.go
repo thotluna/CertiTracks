@@ -1,3 +1,6 @@
+// Package auth contains integration tests for authentication-related functionality.
+// It tests the complete authentication flow including user registration,
+// login, token generation, and protected endpoints.
 package auth_test
 
 import (
@@ -11,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"certitrack/integration"
+	"certitrack/internal/cache/redis"
 	"certitrack/internal/config"
 	"certitrack/internal/handlers"
 	"certitrack/internal/middleware"
@@ -85,9 +90,11 @@ func SetupTestDB(t *testing.T) (*testcontainer.PostgresContainer, func()) {
 
 func setupTestRouter(t *testing.T) *testRouter {
 	dbContainer, cleanup := SetupTestDB(t)
+	redisContainer, cleanupRedis := integration.SetupTestDB(t)
 
 	t.Cleanup(func() {
 		cleanup()
+		cleanupRedis()
 		db, err := dbContainer.DB.DB()
 		if err == nil {
 			db.Exec("TRUNCATE TABLE users CASCADE")
@@ -96,8 +103,29 @@ func setupTestRouter(t *testing.T) *testRouter {
 
 	cfg := GetTestConfig()
 
+	ctx := context.Background()
+	endpoint, err := redisContainer.Container.Host(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get Redis host: %v", err)
+	}
+
+	port, err := redisContainer.Container.MappedPort(ctx, "6379/tcp")
+	if err != nil {
+		t.Fatalf("Failed to get Redis port: %v", err)
+	}
+
+	client, err := redis.NewClient(&config.RedisConfig{
+		URL: "redis://" + endpoint + ":" + port.Port(),
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer client.Close()
+
+	tokenRepo := repositories.NewTokenRepository(client)
 	userRepo := repositories.NewUserRepositoryImpl(dbContainer.DB)
-	authService := services.NewAuthService(cfg, userRepo)
+	authService := services.NewAuthService(cfg, userRepo, tokenRepo)
 	middlewareSvc := middleware.NewMiddleware(authService)
 	authHandler := handlers.NewAuthHandler(authService)
 
