@@ -4,16 +4,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"certitrack/internal/config"
 	"certitrack/internal/models"
 	"certitrack/internal/repositories"
 	"certitrack/internal/services"
 	"certitrack/testutils"
 	"certitrack/testutils/mocks"
-
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 )
 
 func testConfig() *config.Config {
@@ -28,12 +30,22 @@ func testConfig() *config.Config {
 	}
 }
 
-func newAuthService() (services.AuthService, *repositories.MockUserRepository) {
+type testAuthService struct {
+	services.AuthService
+	mockClient *mocks.MockRedisClient
+	repo       *repositories.MockUserRepository
+}
+
+func newAuthService() (*testAuthService, *repositories.MockUserRepository) {
 	mockClient := new(mocks.MockRedisClient)
 	repo := repositories.NewMockUserRepository()
 	tokenRepo := repositories.NewTokenRepository(mockClient)
 	svc := services.NewAuthService(testConfig(), repo, tokenRepo)
-	return svc, repo
+	return &testAuthService{
+		AuthService: svc,
+		mockClient:  mockClient,
+		repo:        repo,
+	}, repo
 }
 
 func TestRegister_Success(t *testing.T) {
@@ -93,8 +105,44 @@ func TestLogin_UserNotFound(t *testing.T) {
 	require.ErrorIs(t, err, services.ErrUserNotFound)
 }
 
+func TestLogout_Success(t *testing.T) {
+	testSvc, _ := newAuthService()
+	service := testSvc.AuthService
+	mockClient := testSvc.mockClient
+
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(0, nil)).Once()
+
+	mockClient.On("Set", mock.Anything, mock.Anything, "1", mock.Anything).
+		Return(redis.NewStatusResult("OK", nil)).Once()
+
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(1, nil)).Once()
+
+	reqBuilder := testutils.NewRegisterRequest()
+	_, _ = service.Register(&reqBuilder.RegisterRequest)
+	resp, _ := service.Login(&services.LoginRequest{
+		Email:    reqBuilder.Email,
+		Password: reqBuilder.Password,
+	})
+
+	_, err := service.ValidateAccessToken(resp.AccessToken)
+	require.NoError(t, err)
+
+	logoutRes, err := service.Logout(&services.LogoutRequest{AccessToken: resp.AccessToken})
+	require.NoError(t, err)
+	require.Nil(t, logoutRes.User, "User is not nil")
+	require.Empty(t, logoutRes.AccessToken, "Access Token is not empty")
+
+	_, err = service.ValidateAccessToken(resp.AccessToken)
+	require.Error(t, err, "token should be invalid after logout")
+
+	mockClient.AssertExpectations(t)
+}
+
 func TestRefreshToken_Success(t *testing.T) {
-	svc, _ := newAuthService()
+	testSvc, _ := newAuthService()
+	svc := testSvc.AuthService
 	reqBuilder := testutils.NewRegisterRequest()
 	regResp, _ := svc.Register(&reqBuilder.RegisterRequest)
 
@@ -125,6 +173,9 @@ func TestRefreshToken_ExpiredToken(t *testing.T) {
 
 func TestValidateToken_Valid(t *testing.T) {
 	svc, _ := newAuthService()
+	mockClient := svc.mockClient
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(0, nil)).Once()
 	reqBuilder := testutils.NewRegisterRequest()
 	regResp, _ := svc.Register(&reqBuilder.RegisterRequest)
 
@@ -135,6 +186,9 @@ func TestValidateToken_Valid(t *testing.T) {
 
 func TestValidateToken_Invalid(t *testing.T) {
 	svc, _ := newAuthService()
+	mockClient := svc.mockClient
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(1, nil)).Once()
 
 	_, err := svc.ValidateAccessToken("invalid.token.here")
 	require.ErrorIs(t, err, services.ErrInvalidToken)
@@ -142,6 +196,9 @@ func TestValidateToken_Invalid(t *testing.T) {
 
 func TestGetUserFromToken_Success(t *testing.T) {
 	svc, _ := newAuthService()
+	mockClient := svc.mockClient
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(0, nil)).Once()
 	reqBuilder := testutils.NewRegisterRequest()
 	regResp, _ := svc.Register(&reqBuilder.RegisterRequest)
 
@@ -152,6 +209,9 @@ func TestGetUserFromToken_Success(t *testing.T) {
 
 func TestGetUserFromToken_UserNotFound(t *testing.T) {
 	svc, _ := newAuthService()
+	mockClient := svc.mockClient
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(0, nil)).Once()
 
 	cfg := testConfig()
 	token := generateTestToken(t, cfg, uuid.New().String(), time.Hour)
@@ -203,29 +263,65 @@ func TestValidateToken_InvalidSignature(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			svc, _ := newAuthService()
+			testSvc, _ := newAuthService()
+			svc := testSvc.AuthService
+			mockClient := testSvc.mockClient
+
+			// Configurar el mock para la validación del token
+			mockClient.On("Exists", mock.Anything, mock.Anything).
+				Return(redis.NewIntResult(0, nil)).Once()
+
 			token := tc.setup(t, testConfig())
 
 			_, err := svc.ValidateAccessToken(token)
 			require.Error(t, err)
 			require.Equal(t, services.ErrInvalidToken, err, "expected invalid token error for case: %s", tc.name)
+
+			// Verificar que se llamaron todas las expectativas
+			mockClient.AssertExpectations(t)
 		})
 	}
 }
 
 func TestValidateToken_MissingClaims(t *testing.T) {
-	svc, _ := newAuthService()
+	testSvc, _ := newAuthService()
+	svc := testSvc.AuthService
+	mockClient := testSvc.mockClient
 
-	token := jwt.New(jwt.SigningMethodRS256)
-	tokenString, _ := token.SignedString([]byte("some-rsa-key"))
+	// Configurar el mock para la validación del token
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(0, nil)).Once()
+
+	// Crear un token con claims pero sin audiencia
+	claims := services.JWTClaims{
+		UserID: "test-user",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+			Issuer:    "test-issuer",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	cfg := testConfig()
+	tokenString, _ := token.SignedString([]byte(cfg.JWT.Secret))
 
 	_, err := svc.ValidateAccessToken(tokenString)
 	require.Error(t, err)
-	require.Equal(t, services.ErrInvalidToken, err)
+	require.Equal(t, services.ErrInvalidAudience, err, "expected invalid audience error")
+
+	// Verificar que se llamaron todas las expectativas
+	mockClient.AssertExpectations(t)
 }
 
 func TestValidateToken_WrongAudience(t *testing.T) {
-	svc, _ := newAuthService()
+	testSvc, _ := newAuthService()
+	svc := testSvc.AuthService
+	mockClient := testSvc.mockClient
+
+	// Configurar el mock para la validación del token
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(0, nil)).Once()
+
 	cfg := testConfig()
 
 	claims := services.JWTClaims{
@@ -240,14 +336,23 @@ func TestValidateToken_WrongAudience(t *testing.T) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, _ := token.SignedString([]byte(cfg.JWT.Secret))
 
-	validatedClaims, err := svc.ValidateAccessToken(tokenString)
-	require.NoError(t, err)
-	require.NotNil(t, validatedClaims)
-	require.Equal(t, "test-user", validatedClaims.UserID)
+	_, err := svc.ValidateAccessToken(tokenString)
+	require.Error(t, err)
+	require.Equal(t, services.ErrInvalidAudience, err, "expected invalid audience error")
+
+	// Verificar que se llamaron todas las expectativas
+	mockClient.AssertExpectations(t)
 }
 
 func TestValidateToken_Expired(t *testing.T) {
-	svc, _ := newAuthService()
+	testSvc, _ := newAuthService()
+	svc := testSvc.AuthService
+	mockClient := testSvc.mockClient
+
+	// Configurar el mock para la validación del token
+	mockClient.On("Exists", mock.Anything, mock.Anything).
+		Return(redis.NewIntResult(0, nil)).Maybe()
+
 	cfg := testConfig()
 
 	claims := services.JWTClaims{
@@ -265,6 +370,9 @@ func TestValidateToken_Expired(t *testing.T) {
 	_, err := svc.ValidateAccessToken(tokenString)
 	require.Error(t, err)
 	require.Equal(t, services.ErrTokenExpired, err)
+
+	// Verificar que se llamaron todas las expectativas
+	mockClient.AssertExpectations(t)
 }
 
 func generateTestToken(t *testing.T, cfg *config.Config, userID string, expiry time.Duration) string {

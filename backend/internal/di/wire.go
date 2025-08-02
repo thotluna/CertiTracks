@@ -1,3 +1,6 @@
+//go:build wireinject
+// +build wireinject
+
 // Package di provides dependency injection setup using Google Wire.
 // It defines and wires together all the application's components,
 // including services, repositories, and their dependencies.

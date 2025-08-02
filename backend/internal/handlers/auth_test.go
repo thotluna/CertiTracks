@@ -14,76 +14,13 @@ import (
 	"certitrack/internal/services"
 	"certitrack/internal/validators"
 	"certitrack/testutils"
+	"certitrack/testutils/mocks"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-type MockAuthService struct {
-	mock.Mock
-}
-
-var _ services.AuthService = (*MockAuthService)(nil)
-
-func (m *MockAuthService) Register(req *services.RegisterRequest) (*services.AuthResponse, error) {
-	args := m.Called(req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.AuthResponse), args.Error(1)
-}
-
-func (m *MockAuthService) Login(req *services.LoginRequest) (*services.AuthResponse, error) {
-	args := m.Called(req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.AuthResponse), args.Error(1)
-}
-
-func (m *MockAuthService) RefreshToken(req *services.RefreshRequest) (*services.AuthResponse, error) {
-	args := m.Called(req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.AuthResponse), args.Error(1)
-}
-
-func (m *MockAuthService) GetUserFromToken(token string) (*models.User, error) {
-	args := m.Called(token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.User), args.Error(1)
-}
-
-func (m *MockAuthService) ValidateAccessToken(token string) (*services.JWTClaims, error) {
-	args := m.Called(token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.JWTClaims), args.Error(1)
-}
-
-func (m *MockAuthService) ValidateRefreshToken(token string) (*services.JWTClaims, error) {
-	args := m.Called(token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.JWTClaims), args.Error(1)
-}
-
-func (m *MockAuthService) HashPassword(password string) (string, error) {
-	args := m.Called(password)
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockAuthService) CheckPassword(password, hash string) bool {
-	args := m.Called(password, hash)
-	return args.Bool(0)
-}
 
 func setupTestRouter(handler *handlers.AuthHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -102,7 +39,7 @@ func setupTestRouter(handler *handlers.AuthHandler) *gin.Engine {
 }
 
 func TestAuthHandler_Register_Success(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 
 	reqBuilder := testutils.NewRegisterRequest()
@@ -147,7 +84,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 }
 
 func TestAuthHandler_Register_EmailExists(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 	reqBuilder := testutils.NewRegisterRequest()
 
@@ -172,7 +109,7 @@ func TestAuthHandler_Register_EmailExists(t *testing.T) {
 }
 
 func TestAuthHandler_Login_Success(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 	reqBuilder := testutils.NewRegisterRequest()
 
@@ -210,7 +147,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 }
 
 func TestAuthHandler_RefreshToken_Success(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 
 	expectedResponse := &services.AuthResponse{
@@ -240,7 +177,7 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 }
 
 func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("Login", mock.AnythingOfType("*services.LoginRequest")).
@@ -264,7 +201,7 @@ func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 }
 
 func TestAuthHandler_Login_UserNotFound(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("Login", mock.AnythingOfType("*services.LoginRequest")).
@@ -289,7 +226,7 @@ func TestAuthHandler_Login_UserNotFound(t *testing.T) {
 }
 
 func TestAuthHandler_RefreshToken_Expired(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("RefreshToken", mock.AnythingOfType("*services.RefreshRequest")).
@@ -313,7 +250,7 @@ func TestAuthHandler_RefreshToken_Expired(t *testing.T) {
 }
 
 func TestAuthHandler_RefreshToken_Invalid(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("RefreshToken", mock.AnythingOfType("*services.RefreshRequest")).
@@ -337,7 +274,7 @@ func TestAuthHandler_RefreshToken_Invalid(t *testing.T) {
 }
 
 func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
-	handler := handlers.NewAuthHandler(new(MockAuthService))
+	handler := handlers.NewAuthHandler(new(mocks.MockAuthService))
 	r := setupTestRouter(handler)
 
 	tests := []struct {
@@ -384,7 +321,7 @@ func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
 }
 
 func TestAuthHandler_InternalServerError(t *testing.T) {
-	mockService := new(MockAuthService)
+	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
 
 	mockService.On("Login", mock.AnythingOfType("*services.LoginRequest")).
@@ -408,7 +345,7 @@ func TestAuthHandler_InternalServerError(t *testing.T) {
 }
 
 func TestAuthHandler_InvalidJSON(t *testing.T) {
-	handler := handlers.NewAuthHandler(new(MockAuthService))
+	handler := handlers.NewAuthHandler(new(mocks.MockAuthService))
 	r := setupTestRouter(handler)
 
 	tests := []struct {

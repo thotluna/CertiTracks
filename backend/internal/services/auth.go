@@ -17,8 +17,10 @@ import (
 type AuthService interface {
 	Register(req *RegisterRequest) (*AuthResponse, error)
 	Login(req *LoginRequest) (*AuthResponse, error)
+	Logout(req *LogoutRequest) (*AuthResponse, error)
 	RefreshToken(req *RefreshRequest) (*AuthResponse, error)
 	GetUserFromToken(token string) (*models.User, error)
+	IsTokenRevoked(tokenString string) (bool, error)
 	ValidateAccessToken(token string) (*JWTClaims, error)
 	ValidateRefreshToken(token string) (*JWTClaims, error)
 	HashPassword(password string) (string, error)
@@ -72,8 +74,10 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrUserExists         = errors.New("user with this email already exists")
 	ErrUserNotFound       = errors.New("user not found")
-	ErrInvalidToken       = errors.New("invalid token")
+	ErrInvalidToken       = errors.New("invalid or expired token")
 	ErrTokenExpired       = errors.New("token has expired")
+	ErrRefreshTokenFailed = errors.New("failed to refresh token")
+	ErrInvalidAudience    = errors.New("invalid token audience")
 )
 
 func NewAuthService(config *config.Config, repository repositories.UserRepository, tokenRepo repositories.TokenRepository) *AuthServiceImpl {
@@ -163,9 +167,21 @@ func (s *AuthServiceImpl) Login(req *LoginRequest) (*AuthResponse, error) {
 	}, nil
 }
 
-func (s *AuthServiceImpl) Logout(req *LogoutRequest) error {
+func (s *AuthServiceImpl) Logout(req *LogoutRequest) (*AuthResponse, error) {
+	if req.AccessToken == "" {
+		return nil, ErrInvalidToken
+	}
+	expiration := s.config.JWT.AccessTokenExpiry
+	err := s.tokenRepo.RevokeToken(req.AccessToken, expiration)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil
+	return &AuthResponse{
+		User:         nil,
+		AccessToken:  "",
+		RefreshToken: "",
+	}, nil
 }
 
 func (s *AuthServiceImpl) RefreshToken(req *RefreshRequest) (*AuthResponse, error) {
@@ -252,7 +268,21 @@ func (s *AuthServiceImpl) GenerateRefreshToken(user *models.User) (string, error
 	return token.SignedString([]byte(s.config.JWT.Secret))
 }
 
+func (s *AuthServiceImpl) IsTokenRevoked(tokenString string) (bool, error) {
+	return s.tokenRepo.IsTokenRevoked(tokenString)
+}
+
 func (s *AuthServiceImpl) ValidateAccessToken(tokenString string) (*JWTClaims, error) {
+
+	isRevoked, err := s.IsTokenRevoked(tokenString)
+	if err != nil {
+		return nil, err
+	}
+
+	if isRevoked {
+		return nil, ErrInvalidToken
+	}
+
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
@@ -267,11 +297,30 @@ func (s *AuthServiceImpl) ValidateAccessToken(tokenString string) (*JWTClaims, e
 		return nil, ErrInvalidToken
 	}
 
-	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
-		return claims, nil
+	if !token.Valid {
+		return nil, ErrInvalidToken
 	}
 
-	return nil, ErrInvalidToken
+	claims, ok := token.Claims.(*JWTClaims)
+	if !ok {
+		return nil, ErrInvalidToken
+	}
+
+	// Validar la audiencia del token
+	audienceValid := false
+	expectedAudience := s.config.JWT.Audience
+	for _, aud := range claims.Audience {
+		if aud == expectedAudience {
+			audienceValid = true
+			break
+		}
+	}
+
+	if !audienceValid {
+		return nil, ErrInvalidAudience
+	}
+
+	return claims, nil
 }
 
 func (s *AuthServiceImpl) ValidateRefreshToken(tokenString string) (*JWTClaims, error) {

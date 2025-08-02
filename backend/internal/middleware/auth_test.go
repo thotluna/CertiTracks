@@ -9,74 +9,12 @@ import (
 	"certitrack/internal/middleware"
 	"certitrack/internal/models"
 	"certitrack/internal/services"
+	"certitrack/testutils/mocks"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type mockAuthService struct {
-	mock.Mock
-}
-
-func (m *mockAuthService) Register(req *services.RegisterRequest) (*services.AuthResponse, error) {
-	args := m.Called(req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.AuthResponse), args.Error(1)
-}
-
-func (m *mockAuthService) Login(req *services.LoginRequest) (*services.AuthResponse, error) {
-	args := m.Called(req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.AuthResponse), args.Error(1)
-}
-
-func (m *mockAuthService) RefreshToken(req *services.RefreshRequest) (*services.AuthResponse, error) {
-	args := m.Called(req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.AuthResponse), args.Error(1)
-}
-
-func (m *mockAuthService) GetUserFromToken(token string) (*models.User, error) {
-	args := m.Called(token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.User), args.Error(1)
-}
-
-func (m *mockAuthService) ValidateAccessToken(token string) (*services.JWTClaims, error) {
-	args := m.Called(token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.JWTClaims), args.Error(1)
-}
-
-func (m *mockAuthService) ValidateRefreshToken(token string) (*services.JWTClaims, error) {
-	args := m.Called(token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*services.JWTClaims), args.Error(1)
-}
-
-func (m *mockAuthService) HashPassword(password string) (string, error) {
-	args := m.Called(password)
-	return args.String(0), args.Error(1)
-}
-
-func (m *mockAuthService) CheckPassword(password, hash string) bool {
-	args := m.Called(password, hash)
-	return args.Bool(0)
-}
 
 func setupTestRouter(authService services.AuthService, mwFunc gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -118,7 +56,7 @@ func TestAuthMiddleware(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupAuth      func() string
-		setupMock      func(*mockAuthService)
+		setupMock      func(*mocks.MockAuthService)
 		expectedStatus int
 		expectedError  string
 	}{
@@ -127,7 +65,7 @@ func TestAuthMiddleware(t *testing.T) {
 			setupAuth: func() string {
 				return "valid.token.here"
 			},
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mocks.MockAuthService) {
 				m.On("GetUserFromToken", "valid.token.here").
 					Return(&models.User{
 						ID:        userID,
@@ -143,7 +81,7 @@ func TestAuthMiddleware(t *testing.T) {
 		{
 			name:           "missing authorization header",
 			setupAuth:      func() string { return "" },
-			setupMock:      func(*mockAuthService) {},
+			setupMock:      func(*mocks.MockAuthService) {},
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  "Authorization header is required",
 		},
@@ -152,7 +90,7 @@ func TestAuthMiddleware(t *testing.T) {
 			setupAuth: func() string {
 				return "invalidtoken"
 			},
-			setupMock:      func(*mockAuthService) {},
+			setupMock:      func(*mocks.MockAuthService) {},
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  "Authorization header must start with 'Bearer '",
 		},
@@ -161,7 +99,7 @@ func TestAuthMiddleware(t *testing.T) {
 			setupAuth: func() string {
 				return ""
 			},
-			setupMock:      func(*mockAuthService) {},
+			setupMock:      func(*mocks.MockAuthService) {},
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  "Authorization header is required",
 		},
@@ -170,7 +108,7 @@ func TestAuthMiddleware(t *testing.T) {
 			setupAuth: func() string {
 				return "invalid.token.here"
 			},
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mocks.MockAuthService) {
 				m.On("GetUserFromToken", "invalid.token.here").
 					Return(nil, services.ErrInvalidToken)
 			},
@@ -181,7 +119,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			authService := new(mockAuthService)
+			authService := new(mocks.MockAuthService)
 			tc.setupMock(authService)
 
 			mw := middleware.NewMiddleware(authService)
@@ -190,11 +128,12 @@ func TestAuthMiddleware(t *testing.T) {
 			req := httptest.NewRequest("GET", "/test", nil)
 			token := tc.setupAuth()
 			if token != "" {
-				if tc.name == "invalid token format" {
+				switch tc.name {
+				case "invalid token format":
 					req.Header.Set("Authorization", token)
-				} else if tc.name == "empty token" {
+				case "empty token":
 					req.Header.Set("Authorization", "Bearer "+token)
-				} else {
+				default:
 					req.Header.Set("Authorization", "Bearer "+token)
 				}
 			}
@@ -219,14 +158,14 @@ func TestAdminMiddleware(t *testing.T) {
 	tests := []struct {
 		name           string
 		authToken      string
-		setupMock      func(*mockAuthService)
+		setupMock      func(*mocks.MockAuthService)
 		expectedStatus int
 		expectedError  string
 	}{
 		{
 			name:      "admin access",
 			authToken: "admin.token",
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mocks.MockAuthService) {
 				m.On("GetUserFromToken", "admin.token").
 					Return(&models.User{
 						ID:        adminID,
@@ -242,7 +181,7 @@ func TestAdminMiddleware(t *testing.T) {
 		{
 			name:      "user access denied",
 			authToken: "user.token",
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mocks.MockAuthService) {
 				m.On("GetUserFromToken", "user.token").
 					Return(&models.User{
 						ID:        userID,
@@ -259,7 +198,7 @@ func TestAdminMiddleware(t *testing.T) {
 		{
 			name:           "missing token",
 			authToken:      "",
-			setupMock:      func(*mockAuthService) {},
+			setupMock:      func(*mocks.MockAuthService) {},
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  "Authorization header is required",
 		},
@@ -267,7 +206,7 @@ func TestAdminMiddleware(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			authService := new(mockAuthService)
+			authService := new(mocks.MockAuthService)
 			tc.setupMock(authService)
 
 			mw := middleware.NewMiddleware(authService)
@@ -296,7 +235,7 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupAuth      func() string
-		setupMock      func(*mockAuthService)
+		setupMock      func(*mocks.MockAuthService)
 		expectedStatus int
 		shouldSetUser  bool
 		shouldCallAuth bool
@@ -306,7 +245,7 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 			setupAuth: func() string {
 				return "valid.token.here"
 			},
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mocks.MockAuthService) {
 				m.On("GetUserFromToken", "valid.token.here").
 					Return(&models.User{
 						ID:        userID,
@@ -326,7 +265,7 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 			setupAuth: func() string {
 				return ""
 			},
-			setupMock:      func(*mockAuthService) {},
+			setupMock:      func(*mocks.MockAuthService) {},
 			expectedStatus: http.StatusNoContent,
 			shouldSetUser:  false,
 			shouldCallAuth: false,
@@ -336,7 +275,7 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 			setupAuth: func() string {
 				return "invalid.token"
 			},
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mocks.MockAuthService) {
 				m.On("GetUserFromToken", "invalid.token").
 					Return(nil, errors.New("invalid token"))
 			},
@@ -349,7 +288,7 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 			setupAuth: func() string {
 				return ""
 			},
-			setupMock:      func(*mockAuthService) {},
+			setupMock:      func(*mocks.MockAuthService) {},
 			expectedStatus: http.StatusNoContent,
 			shouldSetUser:  false,
 			shouldCallAuth: false,
@@ -358,7 +297,7 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			authService := new(mockAuthService)
+			authService := new(mocks.MockAuthService)
 			tc.setupMock(authService)
 
 			r := gin.New()
@@ -385,8 +324,7 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 			r.ServeHTTP(w, req)
 
 			require.Equal(t, tc.expectedStatus, w.Code)
-			
-			
+
 			if tc.shouldCallAuth {
 				authService.AssertExpectations(t)
 			}
