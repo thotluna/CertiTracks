@@ -1,8 +1,10 @@
-//go:build wireinject
-
+// Package di provides dependency injection setup using Google Wire.
+// It defines and wires together all the application's components,
+// including services, repositories, and their dependencies.
 package di
 
 import (
+	"certitrack/internal/cache/redis"
 	"certitrack/internal/config"
 	"certitrack/internal/database"
 	"certitrack/internal/handlers"
@@ -14,7 +16,21 @@ import (
 	"gorm.io/gorm"
 )
 
+func provideRedisConfig(cfg *config.Config) *config.RedisConfig {
+	return &cfg.Redis
+}
+
 var (
+	redisClientSet = wire.NewSet(
+		provideRedisConfig,
+		redis.NewClient,
+		wire.Bind(new(repositories.RedisClient), new(*redis.Client)),
+	)
+
+	tokenRepositorySet = wire.NewSet(
+		repositories.NewTokenRepository,
+	)
+
 	repositorySet = wire.NewSet(
 		repositories.NewUserRepositoryImpl,
 	)
@@ -43,7 +59,9 @@ type ServerDependencies struct {
 func InitializeServer() (*ServerDependencies, error) {
 	wire.Build(
 		config.Load,
+		redisClientSet,
 		database.Connect,
+		tokenRepositorySet,
 		repositorySet,
 		serviceSet,
 		handlerSet,

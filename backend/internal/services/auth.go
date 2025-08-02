@@ -27,6 +27,7 @@ type AuthService interface {
 
 type AuthServiceImpl struct {
 	repository repositories.UserRepository
+	tokenRepo  repositories.TokenRepository
 	config     *config.Config
 }
 
@@ -42,6 +43,10 @@ type JWTClaims struct {
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8,max=72"`
+}
+
+type LogoutRequest struct {
+	AccessToken string `json:"access_token" binding:"required"`
 }
 
 type RegisterRequest struct {
@@ -71,10 +76,11 @@ var (
 	ErrTokenExpired       = errors.New("token has expired")
 )
 
-func NewAuthService(config *config.Config, repository repositories.UserRepository) *AuthServiceImpl {
+func NewAuthService(config *config.Config, repository repositories.UserRepository, tokenRepo repositories.TokenRepository) *AuthServiceImpl {
 	return &AuthServiceImpl{
 		config:     config,
 		repository: repository,
+		tokenRepo:  tokenRepo,
 	}
 }
 
@@ -155,6 +161,11 @@ func (s *AuthServiceImpl) Login(req *LoginRequest) (*AuthResponse, error) {
 		RefreshToken: refreshToken,
 		ExpiresAt:    time.Now().Add(s.config.JWT.AccessTokenExpiry),
 	}, nil
+}
+
+func (s *AuthServiceImpl) Logout(req *LogoutRequest) error {
+
+	return nil
 }
 
 func (s *AuthServiceImpl) RefreshToken(req *RefreshRequest) (*AuthResponse, error) {
