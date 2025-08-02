@@ -9,13 +9,13 @@ import (
 	"certitrack/internal/repositories"
 	"certitrack/internal/services"
 	"certitrack/testutils"
+	"certitrack/testutils/mocks"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-// helper to build minimal Config for tests
 func testConfig() *config.Config {
 	return &config.Config{
 		JWT: config.JWTConfig{
@@ -29,8 +29,10 @@ func testConfig() *config.Config {
 }
 
 func newAuthService() (services.AuthService, *repositories.MockUserRepository) {
+	mockClient := new(mocks.MockRedisClient)
 	repo := repositories.NewMockUserRepository()
-	svc := services.NewAuthService(testConfig(), repo)
+	tokenRepo := repositories.NewTokenRepository(mockClient)
+	svc := services.NewAuthService(testConfig(), repo, tokenRepo)
 	return svc, repo
 }
 
@@ -57,7 +59,6 @@ func TestRegister_Success(t *testing.T) {
 func TestRegister_EmailExists(t *testing.T) {
 	svc, repo := newAuthService()
 	reqBuilder := testutils.NewRegisterRequest()
-	// Seed existing user
 	_ = repo.CreateUser(&models.User{Email: reqBuilder.Email, Password: reqBuilder.Password, IsActive: true})
 
 	_, err := svc.Register(&reqBuilder.RegisterRequest)
@@ -115,7 +116,6 @@ func TestRefreshToken_InvalidToken(t *testing.T) {
 func TestRefreshToken_ExpiredToken(t *testing.T) {
 	svc, _ := newAuthService()
 
-	// Create a token that expired 1 hour ago
 	cfg := testConfig()
 	expiredToken := generateTestToken(t, cfg, "test-user-id", -time.Hour)
 
@@ -153,7 +153,6 @@ func TestGetUserFromToken_Success(t *testing.T) {
 func TestGetUserFromToken_UserNotFound(t *testing.T) {
 	svc, _ := newAuthService()
 
-	// Create a valid token for a non-existent user
 	cfg := testConfig()
 	token := generateTestToken(t, cfg, uuid.New().String(), time.Hour)
 
@@ -164,8 +163,8 @@ func TestGetUserFromToken_UserNotFound(t *testing.T) {
 
 func TestValidateToken_InvalidSignature(t *testing.T) {
 	tests := []struct {
-		name    string
-		setup   func(t *testing.T, cfg *config.Config) string
+		name  string
+		setup func(t *testing.T, cfg *config.Config) string
 	}{{
 		name: "different secret",
 		setup: func(t *testing.T, cfg *config.Config) string {
@@ -198,7 +197,6 @@ func TestValidateToken_InvalidSignature(t *testing.T) {
 		name: "tampered token",
 		setup: func(t *testing.T, cfg *config.Config) string {
 			token := generateTestToken(t, cfg, "test-user", time.Hour)
-			// Cambiar un carácter en el token para invalidar la firma
 			return token[:len(token)-2] + "xx"
 		},
 	}}
@@ -218,8 +216,7 @@ func TestValidateToken_InvalidSignature(t *testing.T) {
 func TestValidateToken_MissingClaims(t *testing.T) {
 	svc, _ := newAuthService()
 
-	// Create a token with a different signing method that will be rejected
-	token := jwt.New(jwt.SigningMethodRS256) // Using RS256 instead of HS256
+	token := jwt.New(jwt.SigningMethodRS256)
 	tokenString, _ := token.SignedString([]byte("some-rsa-key"))
 
 	_, err := svc.ValidateAccessToken(tokenString)
@@ -231,7 +228,6 @@ func TestValidateToken_WrongAudience(t *testing.T) {
 	svc, _ := newAuthService()
 	cfg := testConfig()
 
-	// Create token with wrong audience
 	claims := services.JWTClaims{
 		UserID: "test-user",
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -244,7 +240,6 @@ func TestValidateToken_WrongAudience(t *testing.T) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, _ := token.SignedString([]byte(cfg.JWT.Secret))
 
-	// Audience is not validated in the current implementation
 	validatedClaims, err := svc.ValidateAccessToken(tokenString)
 	require.NoError(t, err)
 	require.NotNil(t, validatedClaims)
@@ -255,7 +250,6 @@ func TestValidateToken_Expired(t *testing.T) {
 	svc, _ := newAuthService()
 	cfg := testConfig()
 
-	// Create expired token
 	claims := services.JWTClaims{
 		UserID: "test-user",
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -273,7 +267,6 @@ func TestValidateToken_Expired(t *testing.T) {
 	require.Equal(t, services.ErrTokenExpired, err)
 }
 
-// generateTestToken creates a signed JWT for testing purposes
 func generateTestToken(t *testing.T, cfg *config.Config, userID string, expiry time.Duration) string {
 	t.Helper()
 	claims := services.JWTClaims{
