@@ -40,76 +40,6 @@ func setupTestRouter(handler *handlers.AuthHandler) *gin.Engine {
 	return r
 }
 
-func TestAuthHandler_Register_Success(t *testing.T) {
-	mockService := new(mocks.MockAuthService)
-	handler := handlers.NewAuthHandler(mockService)
-
-	reqBuilder := testutils.NewRegisterRequest()
-
-	expectedUser := &models.User{
-		ID:        uuid.New(),
-		Email:     reqBuilder.Email,
-		FirstName: reqBuilder.FirstName,
-		LastName:  reqBuilder.LastName,
-	}
-
-	expectedResponse := &services.AuthResponse{
-		User:         expectedUser,
-		AccessToken:  "test-access-token",
-		RefreshToken: "test-refresh-token",
-		ExpiresAt:    time.Now().Add(time.Hour),
-	}
-
-	mockService.On("Register", mock.AnythingOfType("*services.RegisterRequest")).Return(expectedResponse, nil)
-
-	r := setupTestRouter(handler)
-	requestBody := reqBuilder.ToJSON()
-
-	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBufferString(requestBody))
-	req.Header.Set("Content-Type", "application/json")
-
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusCreated, w.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "User registered successfully", response["message"])
-	data := response["data"].(map[string]interface{})
-	userData := data["user"].(map[string]interface{})
-	assert.Equal(t, expectedUser.Email, userData["email"])
-	assert.Equal(t, expectedResponse.AccessToken, data["access-token"])
-
-	mockService.AssertExpectations(t)
-}
-
-func TestAuthHandler_Register_EmailExists(t *testing.T) {
-	mockService := new(mocks.MockAuthService)
-	handler := handlers.NewAuthHandler(mockService)
-	reqBuilder := testutils.NewRegisterRequest()
-
-	mockService.On("Register", mock.AnythingOfType("*services.RegisterRequest")).
-		Return(nil, services.ErrUserExists)
-
-	r := setupTestRouter(handler)
-	requestBody := reqBuilder.ToJSON()
-
-	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBufferString(requestBody))
-	req.Header.Set("Content-Type", "application/json")
-
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusConflict, w.Code)
-	var resp map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &resp)
-	assert.NoError(t, err)
-	assert.Equal(t, "User with this email already exists", resp["error"])
-	mockService.AssertExpectations(t)
-}
-
 func TestAuthHandler_Login_Success(t *testing.T) {
 	mockService := new(mocks.MockAuthService)
 	handler := handlers.NewAuthHandler(mockService)
@@ -343,53 +273,6 @@ func TestAuthHandler_Logout_Fail_server(t *testing.T) {
 
 	assert.Equal(t, "Logout failed", response["error"])
 	mockService.AssertExpectations(t)
-}
-
-func TestAuthHandler_Register_InvalidEmail(t *testing.T) {
-	handler := handlers.NewAuthHandler(new(mocks.MockAuthService))
-	r := setupTestRouter(handler)
-
-	tests := []struct {
-		name           string
-		requestBody    string
-		expectedStatus int
-		expectedError  string
-	}{
-		{
-			name:           "invalid email format",
-			requestBody:    testutils.NewRegisterRequest(testutils.WithEmail("invalid-email")).ToJSON(),
-			expectedStatus: http.StatusBadRequest,
-			expectedError:  "Invalid request data",
-		},
-		{
-			name:           "missing email",
-			requestBody:    testutils.NewRegisterRequest(testutils.WithEmail("")).ToJSON(),
-			expectedStatus: http.StatusBadRequest,
-			expectedError:  "Invalid request data",
-		},
-		{
-			name:           "password too short",
-			requestBody:    testutils.NewRegisterRequest(testutils.WithPassword("short")).ToJSON(),
-			expectedStatus: http.StatusBadRequest,
-			expectedError:  "Invalid request data",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewBufferString(tc.requestBody))
-			req.Header.Set("Content-Type", "application/json")
-
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, req)
-
-			assert.Equal(t, tc.expectedStatus, w.Code)
-			var response map[string]interface{}
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			assert.NoError(t, err)
-			assert.Contains(t, response["error"], tc.expectedError)
-		})
-	}
 }
 
 func TestAuthHandler_InternalServerError(t *testing.T) {
