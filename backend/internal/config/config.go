@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"certitrack/internal/mailer"
+
 	"github.com/joho/godotenv"
 )
 
@@ -57,6 +59,16 @@ type SMTPConfig struct {
 	Username string
 	Password string
 	From     string
+}
+
+func (s SMTPConfig) ToMailerConfig() mailer.Config {
+	return mailer.Config{
+		Host:     s.Host,
+		Port:     s.Port,
+		Username: s.Username,
+		Password: s.Password,
+		From:     s.From,
+	}
 }
 
 type StorageConfig struct {
