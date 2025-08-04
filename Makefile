@@ -71,11 +71,11 @@ test-backend: test-clean test-bu test-bi
 
 test-bu: test-clean
 	@echo "Running backend unit tests..."
-	@cd backend && APP_ENV=test go test -short -v ./internal/...
+	@cd backend && APP_ENV=test GO_ENV=test go test -short ./internal/...
 
 test-bi: test-clean
 	@echo "Running backend integration tests..."
-	@cd backend && APP_ENV=test go test -run Integration -v ./integration/...
+	@cd backend && APP_ENV=test GO_ENV=test go test  ./integration/...
 
 test-frontend:
 	@echo "Running frontend tests..."
