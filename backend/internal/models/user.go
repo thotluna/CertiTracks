@@ -1,3 +1,5 @@
+// Package models contains the data structures and business logic
+// for the application's domain entities.
 package models
 
 import (
