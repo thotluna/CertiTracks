@@ -18,7 +18,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 
 	var gormLogger logger.Interface
 	if os.Getenv("GO_ENV") != "test" {
-		gormLogger = logger.Default.LogMode(logger.Info)
+		gormLogger = logger.Default.LogMode(logger.Silent)
 	} else {
 		gormLogger = logger.Default.LogMode(logger.Silent)
 	}
@@ -37,8 +37,9 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)
-
-	log.Println("✅ Database connection established")
+	if os.Getenv("GO_ENV") != "test" {
+		log.Println("✅ Database connection established")
+	}
 	return db, nil
 }
 
