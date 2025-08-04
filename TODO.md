@@ -4,7 +4,7 @@
 
 ### Fase 1: Configuración Inicial
 1. [x] Crear modelo `PasswordResetToken`
-2. [ ] Configurar servicio de correo (ej: SMTP o servicio externo)
+2. [x] Configurar servicio de correo (ej: SMTP o servicio externo)
 
 ### Fase 2: Solicitud de Restablecimiento
 1. [ ] Test: Endpoint POST `/auth/forgot-password`
