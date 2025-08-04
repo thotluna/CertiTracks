@@ -3,10 +3,8 @@
 ## Implementación de Recuperación de Contraseña (TDD)
 
 ### Fase 1: Configuración Inicial
-1. [ ] Crear migración para la tabla `password_reset_tokens`
-   - Campos: id, user_id, token, expires_at, used, created_at, updated_at
-2. [ ] Crear modelo `PasswordResetToken`
-3. [ ] Configurar servicio de correo (ej: SMTP o servicio externo)
+1. [x] Crear modelo `PasswordResetToken`
+2. [ ] Configurar servicio de correo (ej: SMTP o servicio externo)
 
 ### Fase 2: Solicitud de Restablecimiento
 1. [ ] Test: Endpoint POST `/auth/forgot-password`
