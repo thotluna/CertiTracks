@@ -292,20 +292,17 @@ func (s *AuthServiceImpl) GenerateRefreshToken(user *models.User) (string, error
 }
 
 func (s *AuthServiceImpl) IsTokenRevoked(tokenString string) (bool, error) {
-	log.Println("entrando a preguntar ===============> ")
 	return s.tokenRepo.IsTokenRevoked(tokenString)
 }
 
 func (s *AuthServiceImpl) ValidateAccessToken(tokenString string) (*JWTClaims, error) {
 
-	log.Println("entrando a validar ===============> ")
 	isRevoked, err := s.IsTokenRevoked(tokenString)
 
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println("Revoked ===============> ", isRevoked, tokenString)
 	if isRevoked {
 		return nil, ErrInvalidToken
 	}
