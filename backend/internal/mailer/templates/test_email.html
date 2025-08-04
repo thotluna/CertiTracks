@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Email</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #f8f9fa; padding: 20px; text-align: center; }
+        .content { padding: 20px; }
+        .footer { margin-top: 20px; font-size: 0.8em; text-align: center; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Test Email</h1>
+        </div>
+        <div class="content">
+            <p>This is a test email sent at {{ .Data.Timestamp }}</p>
+            {{ if .Data.TestData }}
+            <p>Test data: {{ .Data.TestData }}</p>
+            {{ end }}
+        </div>
+        <div class="footer">
+            <p>This is an automated message, please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>
