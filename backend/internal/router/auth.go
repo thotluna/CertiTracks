@@ -10,7 +10,6 @@ func setupAuthRoutes(rg *gin.RouterGroup, deps *RouterDeps) {
 		auth.POST("/login", deps.AuthHandler.Login)
 		auth.POST("/register", deps.AuthHandler.Register)
 		auth.POST("/refresh", deps.AuthHandler.RefreshToken)
-		auth.POST("/logout", deps.AuthHandler.Logout)
 	}
 }
 
@@ -19,5 +18,6 @@ func setupProtectedAuthRoutes(rg *gin.RouterGroup, deps *RouterDeps) {
 	{
 		auth.GET("/profile", deps.AuthHandler.GetProfile)
 		auth.POST("/change-password", deps.AuthHandler.ChangePassword)
+		auth.POST("/logout", deps.AuthHandler.Logout)
 	}
 }

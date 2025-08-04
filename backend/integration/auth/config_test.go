@@ -121,7 +121,12 @@ func setupTestRouter(t *testing.T) *testRouter {
 	if err != nil {
 		t.Fatalf("Failed to connect to Redis: %v", err)
 	}
-	defer client.Close()
+
+	t.Cleanup(func() {
+		if client != nil {
+			client.Close()
+		}
+	})
 
 	tokenRepo := repositories.NewTokenRepository(client)
 	userRepo := repositories.NewUserRepositoryImpl(dbContainer.DB)
@@ -141,6 +146,11 @@ func setupTestRouter(t *testing.T) *testRouter {
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.RefreshToken)
+			protected := auth.Group("")
+			protected.Use(middlewareSvc.AuthMiddleware())
+			{
+				protected.POST("/logout", authHandler.Logout)
+			}
 		}
 
 		api.GET("/me", middlewareSvc.AuthMiddleware(), func(c *gin.Context) {
