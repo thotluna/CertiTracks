@@ -3,6 +3,8 @@ package services
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"time"
 
 	"certitrack/internal/config"
@@ -18,6 +20,7 @@ type AuthService interface {
 	Register(req *RegisterRequest) (*AuthResponse, error)
 	Login(req *LoginRequest) (*AuthResponse, error)
 	Logout(req *LogoutRequest) (*AuthResponse, error)
+	RevokeToken(req *LogoutRequest) (*AuthResponse, error)
 	RefreshToken(req *RefreshRequest) (*AuthResponse, error)
 	GetUserFromToken(token string) (*models.User, error)
 	IsTokenRevoked(tokenString string) (bool, error)
@@ -48,7 +51,8 @@ type LoginRequest struct {
 }
 
 type LogoutRequest struct {
-	AccessToken string `json:"access_token" binding:"required"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type RegisterRequest struct {
@@ -168,20 +172,39 @@ func (s *AuthServiceImpl) Login(req *LoginRequest) (*AuthResponse, error) {
 }
 
 func (s *AuthServiceImpl) Logout(req *LogoutRequest) (*AuthResponse, error) {
-	if req.AccessToken == "" {
-		return nil, ErrInvalidToken
-	}
-	expiration := s.config.JWT.AccessTokenExpiry
-	err := s.tokenRepo.RevokeToken(req.AccessToken, expiration)
-	if err != nil {
-		return nil, err
+	return s.RevokeToken(req)
+}
+
+func (s *AuthServiceImpl) RevokeToken(req *LogoutRequest) (*AuthResponse, error) {
+
+	if req.AccessToken == "" && req.RefreshToken == "" {
+		log.Printf("RevokeToken failed: no tokens provided")
+		return nil, fmt.Errorf("%w: neither access_token nor refresh_token provided", ErrInvalidToken)
 	}
 
-	return &AuthResponse{
-		User:         nil,
-		AccessToken:  "",
-		RefreshToken: "",
-	}, nil
+	if req.AccessToken != "" {
+		log.Printf("Revoking access token")
+		if err := s.tokenRepo.RevokeToken(
+			req.AccessToken,
+			s.config.JWT.AccessTokenExpiry,
+		); err != nil {
+			log.Printf("Failed to revoke access token: %v", err)
+			return nil, fmt.Errorf("failed to revoke access token: %w", err)
+		}
+	}
+
+	if req.RefreshToken != "" {
+		log.Printf("Revoking refresh token")
+		if err := s.tokenRepo.RevokeToken(
+			req.RefreshToken,
+			s.config.JWT.RefreshTokenExpiry,
+		); err != nil {
+			log.Printf("Failed to revoke refresh token: %v", err)
+			return nil, fmt.Errorf("failed to revoke refresh token: %w", err)
+		}
+	}
+
+	return &AuthResponse{}, nil
 }
 
 func (s *AuthServiceImpl) RefreshToken(req *RefreshRequest) (*AuthResponse, error) {
@@ -269,16 +292,20 @@ func (s *AuthServiceImpl) GenerateRefreshToken(user *models.User) (string, error
 }
 
 func (s *AuthServiceImpl) IsTokenRevoked(tokenString string) (bool, error) {
+	log.Println("entrando a preguntar ===============> ")
 	return s.tokenRepo.IsTokenRevoked(tokenString)
 }
 
 func (s *AuthServiceImpl) ValidateAccessToken(tokenString string) (*JWTClaims, error) {
 
+	log.Println("entrando a validar ===============> ")
 	isRevoked, err := s.IsTokenRevoked(tokenString)
+
 	if err != nil {
 		return nil, err
 	}
 
+	log.Println("Revoked ===============> ", isRevoked, tokenString)
 	if isRevoked {
 		return nil, ErrInvalidToken
 	}

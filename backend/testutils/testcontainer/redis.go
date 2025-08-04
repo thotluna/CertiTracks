@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -16,11 +17,20 @@ type RedisContainer struct {
 	Container testcontainers.Container
 }
 
+func init() {
+	silentLogWriter := &SilentLogger{}
+	testcontainers.WithLogger(silentLogWriter)
+}
+
 func SetRedisContainer(ctx context.Context) (*RedisContainer, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        "redis:7-alpine",
 		ExposedPorts: []string{"6379/tcp"},
 		WaitingFor:   wait.ForLog("Ready to accept connections"),
+		HostConfigModifier: func(hostConfig *container.HostConfig) {
+			hostConfig.AutoRemove = false
+
+		},
 	}
 
 	redisC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

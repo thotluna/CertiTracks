@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"certitrack/internal/services"
 
@@ -80,6 +81,28 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
+func (h *AuthHandler) Logout(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	response, err := h.authService.Logout(&services.LogoutRequest{
+		AccessToken: token,
+	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Logout failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Logout successful",
+		"data":    response,
+	})
+
+}
+
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req services.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -127,12 +150,6 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Profile retrieved successfully",
 		"data":    user,
-	})
-}
-
-func (h *AuthHandler) Logout(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Logged out successfully. Please remove the token from client storage.",
 	})
 }
 

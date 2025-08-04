@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ type testAuthService struct {
 	repo       *repositories.MockUserRepository
 }
 
-func newAuthService() (*testAuthService, *repositories.MockUserRepository) {
+func newAuthService() (*testAuthService, *repositories.MockUserRepository, *mocks.MockRedisClient) {
 	mockClient := new(mocks.MockRedisClient)
 	repo := repositories.NewMockUserRepository()
 	tokenRepo := repositories.NewTokenRepository(mockClient)
@@ -45,11 +46,11 @@ func newAuthService() (*testAuthService, *repositories.MockUserRepository) {
 		AuthService: svc,
 		mockClient:  mockClient,
 		repo:        repo,
-	}, repo
+	}, repo, mockClient
 }
 
 func TestRegister_Success(t *testing.T) {
-	svc, repo := newAuthService()
+	svc, repo, _ := newAuthService()
 	reqBuilder := testutils.NewRegisterRequest()
 
 	req := &services.RegisterRequest{
@@ -69,7 +70,7 @@ func TestRegister_Success(t *testing.T) {
 }
 
 func TestRegister_EmailExists(t *testing.T) {
-	svc, repo := newAuthService()
+	svc, repo, _ := newAuthService()
 	reqBuilder := testutils.NewRegisterRequest()
 	_ = repo.CreateUser(&models.User{Email: reqBuilder.Email, Password: reqBuilder.Password, IsActive: true})
 
@@ -78,7 +79,7 @@ func TestRegister_EmailExists(t *testing.T) {
 }
 
 func TestLogin_Success(t *testing.T) {
-	svc, _ := newAuthService()
+	svc, _, _ := newAuthService()
 	reqBuilder := testutils.NewRegisterRequest()
 	_, _ = svc.Register(&reqBuilder.RegisterRequest)
 
@@ -89,7 +90,7 @@ func TestLogin_Success(t *testing.T) {
 }
 
 func TestLogin_InvalidPassword(t *testing.T) {
-	svc, _ := newAuthService()
+	svc, _, _ := newAuthService()
 	reqBuilder := testutils.NewRegisterRequest()
 	_, _ = svc.Register(&reqBuilder.RegisterRequest)
 
@@ -98,7 +99,7 @@ func TestLogin_InvalidPassword(t *testing.T) {
 }
 
 func TestLogin_UserNotFound(t *testing.T) {
-	svc, _ := newAuthService()
+	svc, _, _ := newAuthService()
 	reqBuilder := testutils.NewRegisterRequest()
 
 	_, err := svc.Login(&services.LoginRequest{Email: "nonexistent-" + reqBuilder.Email, Password: reqBuilder.Password})
@@ -106,9 +107,8 @@ func TestLogin_UserNotFound(t *testing.T) {
 }
 
 func TestLogout_Success(t *testing.T) {
-	testSvc, _ := newAuthService()
+	testSvc, _, mockClient := newAuthService()
 	service := testSvc.AuthService
-	mockClient := testSvc.mockClient
 
 	mockClient.On("Exists", mock.Anything, mock.Anything).
 		Return(redis.NewIntResult(0, nil)).Once()
@@ -140,8 +140,110 @@ func TestLogout_Success(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestRevokeToken_AccessToken(t *testing.T) {
+	testSvc, _, mockClient := newAuthService()
+	service := testSvc.AuthService
+
+	reqBuilder := testutils.NewRegisterRequest()
+	service.Register(&reqBuilder.RegisterRequest)
+
+	loginResp, _ := service.Login(&services.LoginRequest{
+		Email:    reqBuilder.Email,
+		Password: reqBuilder.Password,
+	})
+
+	tokenKey := "revoked:" + loginResp.AccessToken
+
+	mockClient.On("Set", mock.Anything, tokenKey, "1", mock.Anything).
+		Return(redis.NewStatusResult("OK", nil)).
+		Once()
+
+	logoutRes, err := service.RevokeToken(&services.LogoutRequest{
+		AccessToken:  loginResp.AccessToken,
+		RefreshToken: "",
+	})
+	require.NoError(t, err)
+	require.Nil(t, logoutRes.User, "User should be nil")
+	require.Empty(t, logoutRes.AccessToken, "Access Token should be empty")
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestRevokeToken_RefreshToken(t *testing.T) {
+	testSvc, _, mockClient := newAuthService()
+	service := testSvc.AuthService
+
+	reqBuilder := testutils.NewRegisterRequest()
+	service.Register(&reqBuilder.RegisterRequest)
+
+	loginResp, _ := service.Login(&services.LoginRequest{
+		Email:    reqBuilder.Email,
+		Password: reqBuilder.Password,
+	})
+
+	refreshTokenKey := "revoked:" + loginResp.RefreshToken
+	mockClient.On("Set", mock.Anything, refreshTokenKey, "1", mock.Anything).
+		Return(redis.NewStatusResult("OK", nil)).
+		Once()
+
+	_, err := service.RevokeToken(&services.LogoutRequest{
+		RefreshToken: loginResp.RefreshToken,
+	})
+	require.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestRevokeToken_BothTokens(t *testing.T) {
+	testSvc, _, mockClient := newAuthService()
+	service := testSvc.AuthService
+
+	reqBuilder := testutils.NewRegisterRequest()
+	service.Register(&reqBuilder.RegisterRequest)
+
+	loginResp, _ := service.Login(&services.LoginRequest{
+		Email:    reqBuilder.Email,
+		Password: reqBuilder.Password,
+	})
+
+	accessTokenKey := "revoked:" + loginResp.AccessToken
+	refreshTokenKey := "revoked:" + loginResp.RefreshToken
+
+	// Configurar mocks para ambos tokens
+	mockClient.On("Set", mock.Anything, accessTokenKey, "1", mock.Anything).
+		Return(redis.NewStatusResult("OK", nil)).
+		Once()
+	mockClient.On("Set", mock.Anything, refreshTokenKey, "1", mock.Anything).
+		Return(redis.NewStatusResult("OK", nil)).
+		Once()
+
+	_, err := service.RevokeToken(&services.LogoutRequest{
+		AccessToken:  loginResp.AccessToken,
+		RefreshToken: loginResp.RefreshToken,
+	})
+	require.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestRevokeToken_Error(t *testing.T) {
+	testSvc, _, mockClient := newAuthService()
+	service := testSvc.AuthService
+
+	testToken := "test-token"
+	tokenKey := "revoked:" + testToken
+
+	mockClient.On("Set", mock.Anything, tokenKey, "1", mock.Anything).
+		Return(redis.NewStatusResult("", errors.New("redis error"))).
+		Once()
+
+	_, err := service.RevokeToken(&services.LogoutRequest{
+		AccessToken: testToken,
+	})
+	require.Error(t, err)
+	mockClient.AssertExpectations(t)
+}
+
 func TestRefreshToken_Success(t *testing.T) {
-	testSvc, _ := newAuthService()
+	testSvc, _, _ := newAuthService()
 	svc := testSvc.AuthService
 	reqBuilder := testutils.NewRegisterRequest()
 	regResp, _ := svc.Register(&reqBuilder.RegisterRequest)
@@ -155,14 +257,14 @@ func TestRefreshToken_Success(t *testing.T) {
 }
 
 func TestRefreshToken_InvalidToken(t *testing.T) {
-	svc, _ := newAuthService()
+	svc, _, _ := newAuthService()
 
 	_, err := svc.RefreshToken(&services.RefreshRequest{RefreshToken: "invalid.token.here"})
 	require.ErrorIs(t, err, services.ErrInvalidToken)
 }
 
 func TestRefreshToken_ExpiredToken(t *testing.T) {
-	svc, _ := newAuthService()
+	svc, _, _ := newAuthService()
 
 	cfg := testConfig()
 	expiredToken := generateTestToken(t, cfg, "test-user-id", -time.Hour)
@@ -172,8 +274,7 @@ func TestRefreshToken_ExpiredToken(t *testing.T) {
 }
 
 func TestValidateToken_Valid(t *testing.T) {
-	svc, _ := newAuthService()
-	mockClient := svc.mockClient
+	svc, _, mockClient := newAuthService()
 	mockClient.On("Exists", mock.Anything, mock.Anything).
 		Return(redis.NewIntResult(0, nil)).Once()
 	reqBuilder := testutils.NewRegisterRequest()
@@ -185,8 +286,7 @@ func TestValidateToken_Valid(t *testing.T) {
 }
 
 func TestValidateToken_Invalid(t *testing.T) {
-	svc, _ := newAuthService()
-	mockClient := svc.mockClient
+	svc, _, mockClient := newAuthService()
 	mockClient.On("Exists", mock.Anything, mock.Anything).
 		Return(redis.NewIntResult(1, nil)).Once()
 
@@ -195,8 +295,7 @@ func TestValidateToken_Invalid(t *testing.T) {
 }
 
 func TestGetUserFromToken_Success(t *testing.T) {
-	svc, _ := newAuthService()
-	mockClient := svc.mockClient
+	svc, _, mockClient := newAuthService()
 	mockClient.On("Exists", mock.Anything, mock.Anything).
 		Return(redis.NewIntResult(0, nil)).Once()
 	reqBuilder := testutils.NewRegisterRequest()
@@ -208,8 +307,7 @@ func TestGetUserFromToken_Success(t *testing.T) {
 }
 
 func TestGetUserFromToken_UserNotFound(t *testing.T) {
-	svc, _ := newAuthService()
-	mockClient := svc.mockClient
+	svc, _, mockClient := newAuthService()
 	mockClient.On("Exists", mock.Anything, mock.Anything).
 		Return(redis.NewIntResult(0, nil)).Once()
 
@@ -263,11 +361,9 @@ func TestValidateToken_InvalidSignature(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			testSvc, _ := newAuthService()
+			testSvc, _, mockClient := newAuthService()
 			svc := testSvc.AuthService
-			mockClient := testSvc.mockClient
 
-			// Configurar el mock para la validación del token
 			mockClient.On("Exists", mock.Anything, mock.Anything).
 				Return(redis.NewIntResult(0, nil)).Once()
 
@@ -277,22 +373,18 @@ func TestValidateToken_InvalidSignature(t *testing.T) {
 			require.Error(t, err)
 			require.Equal(t, services.ErrInvalidToken, err, "expected invalid token error for case: %s", tc.name)
 
-			// Verificar que se llamaron todas las expectativas
 			mockClient.AssertExpectations(t)
 		})
 	}
 }
 
 func TestValidateToken_MissingClaims(t *testing.T) {
-	testSvc, _ := newAuthService()
+	testSvc, _, mockClient := newAuthService()
 	svc := testSvc.AuthService
-	mockClient := testSvc.mockClient
 
-	// Configurar el mock para la validación del token
 	mockClient.On("Exists", mock.Anything, mock.Anything).
 		Return(redis.NewIntResult(0, nil)).Once()
 
-	// Crear un token con claims pero sin audiencia
 	claims := services.JWTClaims{
 		UserID: "test-user",
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -309,16 +401,13 @@ func TestValidateToken_MissingClaims(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, services.ErrInvalidAudience, err, "expected invalid audience error")
 
-	// Verificar que se llamaron todas las expectativas
 	mockClient.AssertExpectations(t)
 }
 
 func TestValidateToken_WrongAudience(t *testing.T) {
-	testSvc, _ := newAuthService()
+	testSvc, _, mockClient := newAuthService()
 	svc := testSvc.AuthService
-	mockClient := testSvc.mockClient
 
-	// Configurar el mock para la validación del token
 	mockClient.On("Exists", mock.Anything, mock.Anything).
 		Return(redis.NewIntResult(0, nil)).Once()
 
@@ -340,16 +429,13 @@ func TestValidateToken_WrongAudience(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, services.ErrInvalidAudience, err, "expected invalid audience error")
 
-	// Verificar que se llamaron todas las expectativas
 	mockClient.AssertExpectations(t)
 }
 
 func TestValidateToken_Expired(t *testing.T) {
-	testSvc, _ := newAuthService()
+	testSvc, _, mockClient := newAuthService()
 	svc := testSvc.AuthService
-	mockClient := testSvc.mockClient
 
-	// Configurar el mock para la validación del token
 	mockClient.On("Exists", mock.Anything, mock.Anything).
 		Return(redis.NewIntResult(0, nil)).Maybe()
 
@@ -371,7 +457,6 @@ func TestValidateToken_Expired(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, services.ErrTokenExpired, err)
 
-	// Verificar que se llamaron todas las expectativas
 	mockClient.AssertExpectations(t)
 }
 

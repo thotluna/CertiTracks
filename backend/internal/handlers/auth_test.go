@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -34,6 +35,7 @@ func setupTestRouter(handler *handlers.AuthHandler) *gin.Engine {
 		auth.POST("/register", handler.Register)
 		auth.POST("/login", handler.Login)
 		auth.POST("/refresh", handler.RefreshToken)
+		auth.POST("/logout", handler.Logout)
 	}
 	return r
 }
@@ -270,6 +272,76 @@ func TestAuthHandler_RefreshToken_Invalid(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "Invalid or expired refresh token", response["error"])
+	mockService.AssertExpectations(t)
+}
+
+func TestAuthHandler_Logout_Success(t *testing.T) {
+	mockService := new(mocks.MockAuthService)
+	handler := handlers.NewAuthHandler(mockService)
+
+	expectedToken := "test-token"
+
+	mockService.On("Logout", &services.LogoutRequest{
+		AccessToken: expectedToken,
+	}).Return(&services.AuthResponse{}, nil)
+
+	route := setupTestRouter(handler)
+
+	req, _ := http.NewRequest("POST", "/api/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer "+expectedToken)
+
+	res := httptest.NewRecorder()
+	route.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+
+	assert.NotEmpty(t, res.Body.String())
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Could not parse response: %v. Body: %s", err, res.Body.String())
+	}
+
+	assert.Equal(t, "Logout successful", response["message"])
+	assert.NotNil(t, response["data"])
+
+	data, ok := response["data"].(map[string]interface{})
+	assert.True(t, ok, "data should be an object")
+
+	assert.Nil(t, data["user"])
+	assert.Empty(t, data["access-token"])
+	assert.Empty(t, data["refresh-token"])
+
+	mockService.AssertExpectations(t)
+}
+
+func TestAuthHandler_Logout_Fail_server(t *testing.T) {
+	mockService := new(mocks.MockAuthService)
+	handler := handlers.NewAuthHandler(mockService)
+
+	testToken := "test-token"
+	expectedError := errors.New("error revoking token")
+
+	mockService.On("Logout", &services.LogoutRequest{
+		AccessToken: testToken,
+	}).Return(nil, expectedError)
+
+	route := setupTestRouter(handler)
+
+	req, _ := http.NewRequest("POST", "/api/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer "+testToken)
+
+	res := httptest.NewRecorder()
+	route.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusInternalServerError, res.Code)
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Could not parse response: %v", err)
+	}
+
+	assert.Equal(t, "Logout failed", response["error"])
 	mockService.AssertExpectations(t)
 }
 

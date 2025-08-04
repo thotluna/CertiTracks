@@ -23,6 +23,11 @@ type PostgresContainer struct {
 	Config    *config.Config
 }
 
+func init() {
+	silentLogWriter := &SilentLogger{}
+	testcontainers.WithLogger(silentLogWriter)
+}
+
 func SetupPostgres(ctx context.Context, cfg *config.Config) (*PostgresContainer, error) {
 	testPort := "0" // 0 means system will assign a free port
 	if envPort := os.Getenv("POSTGRES_TEST_PORT"); envPort != "" {
@@ -49,13 +54,13 @@ func SetupPostgres(ctx context.Context, cfg *config.Config) (*PostgresContainer,
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
+				WithOccurrence(1).
 				WithStartupTimeout(30*time.Second),
 			wait.ForListeningPort("5432/tcp").
 				WithStartupTimeout(10*time.Second),
 		),
 		HostConfigModifier: func(hostConfig *container.HostConfig) {
-			hostConfig.AutoRemove = true
+			hostConfig.AutoRemove = false
 			hostConfig.PortBindings = nat.PortMap{
 				"5432/tcp": []nat.PortBinding{{
 					HostIP:   "0.0.0.0",
@@ -70,6 +75,7 @@ func SetupPostgres(ctx context.Context, cfg *config.Config) (*PostgresContainer,
 		Started:          true,
 		Reuse:            false,
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("error creating container: %w", err)
 	}
@@ -112,15 +118,15 @@ func (pc *PostgresContainer) Teardown(ctx context.Context) error {
 		}
 	}
 
-	if pc.DB != nil {
-		sqlDB, err := pc.DB.DB()
-		if err == nil {
-			if err := sqlDB.Close(); err != nil {
-				log.Printf("Error al cerrar la conexión a la base de datos: %v", err)
-				return err
-			}
-		}
-	}
+	// if pc.DB != nil {
+	// 	sqlDB, err := pc.DB.DB()
+	// 	if err == nil {
+	// 		if err := sqlDB.Close(); err != nil {
+	// 			log.Printf("Error al cerrar la conexión a la base de datos: %v", err)
+	// 			return err
+	// 		}
+	// 	}
+	// }
 
 	return nil
 }
