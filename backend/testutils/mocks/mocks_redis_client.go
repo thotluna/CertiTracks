@@ -21,8 +21,16 @@ func (m *MockRedisClient) Set(ctx context.Context, key string, value interface{}
 }
 
 func (m *MockRedisClient) Exists(ctx context.Context, keys ...string) *redis.IntCmd {
-	args := m.Called(ctx, keys)
-	return args.Get(0).(*redis.IntCmd)
+	callArgs := m.Called(append([]interface{}{ctx}, stringSliceToInterfaceSlice(keys)...)...)
+	return callArgs.Get(0).(*redis.IntCmd)
+}
+
+func stringSliceToInterfaceSlice(strSlice []string) []interface{} {
+	ifaceSlice := make([]interface{}, len(strSlice))
+	for i, v := range strSlice {
+		ifaceSlice[i] = v
+	}
+	return ifaceSlice
 }
 
 func (m *MockRedisClient) Close() error {

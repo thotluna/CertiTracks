@@ -84,3 +84,7 @@ func (m *MockAuthService) CheckPassword(password, hash string) bool {
 	args := m.Called(password, hash)
 	return args.Bool(0)
 }
+
+func (m *MockAuthService) RevokeToken(req *services.LogoutRequest) (*services.AuthResponse, error) {
+	return nil, nil
+}
