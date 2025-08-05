@@ -1,17 +1,13 @@
 package handlers_test
 
 import (
-	"bytes"
-	"certitrack/internal/models"
 	"certitrack/internal/services"
 	"certitrack/testutils"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -22,21 +18,10 @@ func TestRegister_Success(t *testing.T) {
 	setupTest(t)
 
 	reqBuilder := testutils.NewRegisterRequest()
-	expectedUser := &models.User{
-		ID:        uuid.New(),
-		Email:     reqBuilder.Email,
-		FirstName: reqBuilder.FirstName,
-		LastName:  reqBuilder.LastName,
-	}
-	expectedResponse := &services.AuthResponse{
-		User:         expectedUser,
-		AccessToken:  "test-access-token",
-		RefreshToken: "test-refresh-token",
-		ExpiresAt:    time.Now().Add(time.Hour),
-	}
+
 	mockAuthSvc.On("Register", mock.AnythingOfType("*services.RegisterRequest")).Return(expectedResponse, nil)
 
-	w := performRegisterRequest(reqBuilder.ToJSON())
+	w := performRegisterRequest(reqBuilder.ToJSON(), registerPath, "")
 	response := assertRegisterResponse(t, w, http.StatusCreated)
 
 	assert.Equal(t, "User registered successfully", response["message"])
@@ -55,7 +40,7 @@ func TestRegister_EmailExists(t *testing.T) {
 	mockAuthSvc.On("Register", mock.AnythingOfType("*services.RegisterRequest")).
 		Return(nil, services.ErrUserExists)
 
-	w := performRegisterRequest(reqBuilder.ToJSON())
+	w := performRegisterRequest(reqBuilder.ToJSON(), registerPath, "")
 	response := assertRegisterResponse(t, w, http.StatusConflict)
 
 	assert.Equal(t, "User with this email already exists", response["error"])
@@ -92,19 +77,11 @@ func TestRegister_InvalidInput(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			setupTest(t)
-			w := performRegisterRequest(tc.requestBody)
+			w := performRegisterRequest(tc.requestBody, registerPath, "")
 			response := assertRegisterResponse(t, w, tc.expectedStatus)
 			assert.Contains(t, response["error"], tc.expectedError)
 		})
 	}
-}
-
-func performRegisterRequest(body string) *httptest.ResponseRecorder {
-	req, _ := http.NewRequest("POST", registerPath, bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	testRouter.ServeHTTP(w, req)
-	return w
 }
 
 func assertRegisterResponse(t *testing.T, w *httptest.ResponseRecorder, expectedStatus int) map[string]interface{} {
