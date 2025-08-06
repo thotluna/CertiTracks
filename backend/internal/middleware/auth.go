@@ -1,3 +1,6 @@
+// Package middleware provides HTTP middleware components for the application.
+// It includes authentication, authorization, and request processing middleware
+// that can be used across different routes and handlers.
 package middleware
 
 import (

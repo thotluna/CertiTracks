@@ -15,7 +15,11 @@ type mailhogMessage struct {
 			Subject []string `json:"Subject"`
 			From    []string `json:"From"`
 		} `json:"Headers"`
+		Body string `json:"Body"`
 	} `json:"Content"`
+	Raw *struct {
+		Data string `json:"Data"`
+	} `json:"Raw"`
 }
 
 type mailhogResponse struct {

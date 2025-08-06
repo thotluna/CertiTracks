@@ -1,3 +1,5 @@
+// Package handlers provides HTTP request handlers for authentication-related endpoints.
+// It handles user registration, login, logout, token refresh, and profile management.
 package handlers
 
 import (
