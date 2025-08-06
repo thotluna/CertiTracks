@@ -23,7 +23,7 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 		AccessToken: expectedToken,
 	}).Return(&services.AuthResponse{}, nil)
 
-	w := performRegisterRequest("", logoutPath, expectedToken)
+	w := performRequest("", logoutPath, expectedToken)
 
 	response := assertRegisterResponse(t, w, http.StatusOK)
 
@@ -53,7 +53,7 @@ func TestAuthHandler_Logout_Fail_server(t *testing.T) {
 		AccessToken: expectedToken,
 	}).Return(nil, expectedError)
 
-	w := performRegisterRequest("", logoutPath, expectedToken)
+	w := performRequest("", logoutPath, expectedToken)
 	response := assertRegisterResponse(t, w, http.StatusInternalServerError)
 
 	assert.Equal(t, "Logout failed", response["error"])
@@ -68,7 +68,7 @@ func TestAuthHandler_Logout_with_invalid_token(t *testing.T) {
 	mockAuthSvc.On("GetUserFromToken", "test-token").
 		Return(nil, services.ErrInvalidToken)
 
-	w := performRegisterRequest("", logoutPath, expectedToken)
+	w := performRequest("", logoutPath, expectedToken)
 
 	response := assertRegisterResponse(t, w, http.StatusUnauthorized)
 

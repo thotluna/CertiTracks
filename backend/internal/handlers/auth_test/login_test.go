@@ -21,7 +21,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 	reqBuilder := testutils.NewRegisterRequest()
 	requestBody := reqBuilder.ToJSON()
 
-	w := performRegisterRequest(requestBody, loginPath, "")
+	w := performRequest(requestBody, loginPath, "")
 	response := assertRegisterResponse(t, w, http.StatusOK)
 
 	assert.Equal(t, "Login successful", response["message"])
@@ -36,7 +36,7 @@ func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 
 	requestBody := `{"email":"test@example.com","password":"WrongPass123!"}`
 
-	w := performRegisterRequest(requestBody, loginPath, "")
+	w := performRequest(requestBody, loginPath, "")
 	response := assertRegisterResponse(t, w, http.StatusUnauthorized)
 
 	assert.Equal(t, "Invalid email or password", response["error"])
@@ -51,10 +51,25 @@ func TestAuthHandler_Login_UserNotFound(t *testing.T) {
 	reqBuilder := testutils.NewRegisterRequest()
 
 	requestBody := reqBuilder.ToJSON()
-	w := performRegisterRequest(requestBody, loginPath, "")
+	w := performRequest(requestBody, loginPath, "")
 
 	response := assertRegisterResponse(t, w, http.StatusUnauthorized)
 	assert.Equal(t, "Invalid email or password", response["error"])
 
+	mockAuthSvc.AssertExpectations(t)
+}
+
+func TestAuthHandler_InternalServerError(t *testing.T) {
+	setupTest(t)
+
+	mockAuthSvc.On("Login", mock.AnythingOfType("*services.LoginRequest")).
+		Return(nil, assert.AnError)
+	reqBuilder := testutils.NewRegisterRequest()
+
+	requestBody := reqBuilder.ToJSON()
+	w := performRequest(requestBody, loginPath, "")
+	response := assertRegisterResponse(t, w, http.StatusInternalServerError)
+
+	assert.Equal(t, "Login failed", response["error"])
 	mockAuthSvc.AssertExpectations(t)
 }

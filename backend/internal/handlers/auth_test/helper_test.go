@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -83,6 +85,7 @@ func setupTestRoute(handler *handlers.AuthHandler) *gin.Engine {
 		{
 			auth.POST("/register", handler.Register)
 			auth.POST("/login", handler.Login)
+			auth.POST("/refresh", handler.RefreshToken)
 		}
 
 		protected := v1.Group("")
@@ -90,7 +93,7 @@ func setupTestRoute(handler *handlers.AuthHandler) *gin.Engine {
 		{
 			auth := protected.Group("/auth")
 			{
-				auth.POST("/refresh", handler.RefreshToken)
+
 				auth.POST("/logout", handler.Logout)
 			}
 		}
@@ -99,7 +102,7 @@ func setupTestRoute(handler *handlers.AuthHandler) *gin.Engine {
 	return r
 }
 
-func performRegisterRequest(body string, path string, token string) *httptest.ResponseRecorder {
+func performRequest(body string, path string, token string) *httptest.ResponseRecorder {
 	req, _ := http.NewRequest("POST", path, bytes.NewBufferString(body))
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -108,4 +111,11 @@ func performRegisterRequest(body string, path string, token string) *httptest.Re
 	w := httptest.NewRecorder()
 	testRouter.ServeHTTP(w, req)
 	return w
+}
+
+func assertRegisterResponse(t *testing.T, w *httptest.ResponseRecorder, expectedStatus int) map[string]interface{} {
+	assert.Equal(t, expectedStatus, w.Code)
+	var response map[string]interface{}
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	return response
 }

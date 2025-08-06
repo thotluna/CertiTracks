@@ -3,9 +3,7 @@ package handlers_test
 import (
 	"certitrack/internal/services"
 	"certitrack/testutils"
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +19,7 @@ func TestRegister_Success(t *testing.T) {
 
 	mockAuthSvc.On("Register", mock.AnythingOfType("*services.RegisterRequest")).Return(expectedResponse, nil)
 
-	w := performRegisterRequest(reqBuilder.ToJSON(), registerPath, "")
+	w := performRequest(reqBuilder.ToJSON(), registerPath, "")
 	response := assertRegisterResponse(t, w, http.StatusCreated)
 
 	assert.Equal(t, "User registered successfully", response["message"])
@@ -40,7 +38,7 @@ func TestRegister_EmailExists(t *testing.T) {
 	mockAuthSvc.On("Register", mock.AnythingOfType("*services.RegisterRequest")).
 		Return(nil, services.ErrUserExists)
 
-	w := performRegisterRequest(reqBuilder.ToJSON(), registerPath, "")
+	w := performRequest(reqBuilder.ToJSON(), registerPath, "")
 	response := assertRegisterResponse(t, w, http.StatusConflict)
 
 	assert.Equal(t, "User with this email already exists", response["error"])
@@ -77,16 +75,9 @@ func TestRegister_InvalidInput(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			setupTest(t)
-			w := performRegisterRequest(tc.requestBody, registerPath, "")
+			w := performRequest(tc.requestBody, registerPath, "")
 			response := assertRegisterResponse(t, w, tc.expectedStatus)
 			assert.Contains(t, response["error"], tc.expectedError)
 		})
 	}
-}
-
-func assertRegisterResponse(t *testing.T, w *httptest.ResponseRecorder, expectedStatus int) map[string]interface{} {
-	assert.Equal(t, expectedStatus, w.Code)
-	var response map[string]interface{}
-	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-	return response
 }
